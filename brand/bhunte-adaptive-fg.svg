@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<g transform="translate(512 512) scale(0.62) translate(-512 -530)">
+  <!-- head -->
+  <circle cx="512" cy="600" r="280" fill="#FFF4E6"/>
+  <!-- Dhaka topi -->
+  <path d="M282 452 L326 214 Q512 222 702 268 L742 452 Q512 488 282 452 Z" fill="#C2541B"/>
+  <path d="M290 410 Q512 446 734 410 L742 452 Q512 488 282 452 Z" fill="#8A3A10"/>
+  <g fill="#F6C9A6">
+    <path d="M420 300 l26 34 l-26 34 l-26 -34 Z"/>
+    <path d="M520 312 l22 30 l-22 30 l-22 -30 Z"/>
+    <path d="M612 328 l20 28 l-20 28 l-20 -28 Z"/>
+  </g>
+  <!-- face -->
+  <ellipse cx="420" cy="600" rx="28" ry="36" fill="#17201B"/>
+  <ellipse cx="604" cy="600" rx="28" ry="36" fill="#17201B"/>
+  <circle cx="430" cy="588" r="9" fill="#FFFFFF"/>
+  <circle cx="614" cy="588" r="9" fill="#FFFFFF"/>
+  <circle cx="362" cy="680" r="36" fill="#F2A27A" opacity="0.7"/>
+  <circle cx="662" cy="680" r="36" fill="#F2A27A" opacity="0.7"/>
+  <path d="M432 700 Q512 776 592 700" fill="none" stroke="#17201B" stroke-width="24" stroke-linecap="round"/>
+  <!-- AI sparkle -->
+  <path d="M812 150 Q822 214 886 224 Q822 234 812 298 Q802 234 738 224 Q802 214 812 150 Z" fill="#F6E3B4"/>
+  <path d="M876 314 Q881 344 910 349 Q881 354 876 384 Q871 354 842 349 Q871 344 876 314 Z" fill="#F6E3B4"/>
+</g></svg>

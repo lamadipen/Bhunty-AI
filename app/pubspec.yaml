@@ -1,0 +1,51 @@
+name: bhunte_ai
+description: "Bhunte AI — Nepali-first POS for small shops"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand/
+  fonts:
+    # Bundled (not fetched at runtime) so Devanagari renders offline.
+    - family: Mukta
+      fonts:
+        - asset: assets/fonts/Mukta-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Mukta-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Mukta-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Mukta-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Mukta-ExtraBold.ttf
+          weight: 800
+
+# Regenerate with: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "../brand/bhunte-icon-square-1024.png"
+  android: true
+  adaptive_icon_background: "#1D6B45"
+  adaptive_icon_foreground: "../brand/bhunte-adaptive-fg-1024.png"
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "../brand/bhunte-logo-1024.png"
+    background_color: "#EEF2EF"
+    theme_color: "#1D6B45"

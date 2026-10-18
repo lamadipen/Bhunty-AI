@@ -1,6 +1,8 @@
 # Miscellaneous
 *.class
 *.lock
+# Apps commit their lock file
+!pubspec.lock
 *.log
 *.pyc
 *.swp

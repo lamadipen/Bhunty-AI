@@ -20,12 +20,39 @@ abstract final class Routes {
   static const reports = '/reports';
 }
 
+/// Phone layout everywhere; on tablets and the web it stays phone-width, centred.
+Widget phoneFrame(BuildContext context, Widget? child) => ColoredBox(
+  color: const Color(0xFFDDE4DF),
+  child: Center(
+    child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: child),
+  ),
+);
+
+/// A bare app shell for screens shown before a shop is open (login, loading).
+class ShellApp extends StatelessWidget {
+  const ShellApp({super.key, required this.home});
+
+  final Widget home;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    title: 'Bhunte AI',
+    debugShowCheckedModeBanner: false,
+    theme: buildTheme(),
+    builder: phoneFrame,
+    home: home,
+  );
+}
+
 class BhunteApp extends StatelessWidget {
-  const BhunteApp({super.key, required this.store, required this.assistant, required this.scanner});
+  const BhunteApp({super.key, required this.store, required this.assistant, required this.scanner, this.signOut});
 
   final ShopStore store;
   final AssistantService assistant;
   final BarcodeScanner scanner;
+
+  /// Set when signed in with Firebase; null in the demo.
+  final Future<void> Function()? signOut;
 
   @override
   Widget build(BuildContext context) {
@@ -33,17 +60,12 @@ class BhunteApp extends StatelessWidget {
       store: store,
       assistant: assistant,
       scanner: scanner,
+      signOut: signOut,
       child: MaterialApp(
         title: 'Bhunte AI',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
-        // Phone layout everywhere; on tablets and the web it stays phone-width, centred.
-        builder: (context, child) => ColoredBox(
-          color: const Color(0xFFDDE4DF),
-          child: Center(
-            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: child),
-          ),
-        ),
+        builder: phoneFrame,
         initialRoute: Routes.home,
         routes: {
           Routes.home: (_) => const HomeScreen(),

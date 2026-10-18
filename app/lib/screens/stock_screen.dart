@@ -6,6 +6,7 @@ import '../core/money.dart';
 import '../core/qty.dart';
 import '../data/models.dart';
 import '../data/proposed_action.dart';
+import '../data/shop_backend.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
 
@@ -88,7 +89,7 @@ class _StockScreenState extends State<StockScreen> {
     context.readStore.addStock([
       for (final r in selected)
         StockLine(productId: r.proposal.productId, qtyMilli: r.qtyMilli, costPaisa: r.proposal.costPaisa),
-    ]);
+    ], source: StockSource.billPhoto);
     setState(() {
       _savedCount = selected.length;
       _stage = _Stage.saved;

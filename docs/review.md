@@ -16,7 +16,7 @@ Items marked ✅ are already handled in the Flutter scaffold (`app/`) or in thes
 ## P1 — product gaps
 
 6. **Bikram Sambat dates.** Shopkeepers think in BS (२०८३ कात्तिक १). Show BS dates everywhere in the UI; store UTC + a `bsDate` key. Day boundaries must use **Asia/Kathmandu (UTC+5:45)**, including `dailySummaries/{date}` keys.
-7. **"Today's sales" must work offline.** `dailySummaries` is written by a Cloud Function, so it lags until sync. Compute the Home card locally from today's cached sales; use the summary only for history/reports.
+7. **"Today's sales" must work offline.** `dailySummaries` is written by a Cloud Function, so it lags until sync. Compute the Home card locally from today's cached sales; use the summary only for history/reports. ✅ done (sales carry a `day` field).
 8. **Void / return a sale.** No way to undo a mistaken sale. Add "बिक्री रद्द" within N minutes, written as a reversing entry (never delete).
 9. **Cash tender options.** Prototype offers exact / 500 / 1000 / 2000. For a रु 75 sale the customer hands over रु 100. Suggest the next 2–3 real notes above the total (50, 100, 500, 1000). ✅ scaffold does this (`suggestTenders`).
 10. **QR confirmation is manual.** With a static QR the shopkeeper taps "पैसा आयो ✓" on trust; fake payment screenshots are a known fraud in Nepal. Keep it in Phase 1 but label it clearly, and prioritise Fonepay dynamic QR with server-side confirmation.
@@ -29,7 +29,7 @@ Items marked ✅ are already handled in the Flutter scaffold (`app/`) or in thes
 
 15. **Embeddings in the product doc** make every catalog read heavier. Keep them in a separate collection or use Firestore vector search on a dedicated field that is never fetched by the app.
 16. **Timestamps offline.** `serverTimestamp()` is null until sync; write both `createdAt` (client) and `syncedAt` (server).
-17. **Security rules and roles** are not mentioned. Owner vs helper roles affect who can void sales or edit udharo; design rules with the data model, not after.
+17. **Security rules and roles** are not mentioned. Owner vs helper roles affect who can void sales or edit udharo; design rules with the data model, not after. ✅ owner-only rules drafted and emulator-tested; roles still to do.
 18. **Phone OTP cost and delivery in Nepal.** Firebase SMS to +977 is billed per message and deliverability varies; budget for it and keep a fallback (Google sign-in) for owners.
 19. **Tool schema gaps.** Add `remove_from_cart`, `set_quantity`, `update_price` and an explicit `unclear` result so the model can say "I'm not sure" instead of guessing. Define `query` as a fixed enum the code implements.
 20. **Ask Bhunte answers** should be templated from query results (code fills numbers into fixed sentences); let the model only choose the template. This keeps principle 3 for chat answers too.

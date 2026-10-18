@@ -201,6 +201,7 @@ class HomeScreen extends StatelessWidget {
 
   void _showShopSheet(BuildContext context) {
     final store = context.readStore;
+    final signOut = context.signOut;
     showBhunteSheet<void>(
       context,
       (c) => Column(
@@ -219,12 +220,28 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Bhunte AI · demo data. लगइन, पसलको सेटिङ र Firebase sync अर्को चरणमा आउँछ।',
-            style: TextStyle(fontSize: 16, color: BColors.inkSoft),
+          Text(
+            store.isSynced
+                ? 'हिसाब फोनमा पनि रहन्छ र इन्टरनेट आएपछि आफैं सिंक हुन्छ।'
+                : 'Bhunte AI · डेमो डाटा। यहाँको हिसाब कतै साँचिँदैन।',
+            style: const TextStyle(fontSize: 16, color: BColors.inkSoft),
           ),
           const SizedBox(height: 16),
           BigButton(label: 'ठीक छ', onPressed: () => Navigator.pop(c)),
+          if (signOut != null) ...[
+            const SizedBox(height: 10),
+            BigButton(
+              label: 'बाहिर निस्कनुस् · Sign out',
+              outlineColor: BColors.line,
+              foreground: BColors.ink,
+              height: 56,
+              fontSize: 18,
+              onPressed: () {
+                Navigator.pop(c);
+                signOut();
+              },
+            ),
+          ],
         ],
       ),
     );

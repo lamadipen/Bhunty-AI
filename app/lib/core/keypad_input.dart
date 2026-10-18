@@ -9,7 +9,15 @@ abstract final class Keys {
 /// Applies one keypad key to the current entry text.
 /// No leading zeros, at most one decimal point (only when [allowDecimal]),
 /// at most [maxDecimals] digits after it, at most [maxDigits] before it.
-String applyKey(String current, String key, {bool allowDecimal = false, int maxDigits = 6, int maxDecimals = 3}) {
+/// Set [leadingZeros] for codes and phone numbers, where "0" is a real digit.
+String applyKey(
+  String current,
+  String key, {
+  bool allowDecimal = false,
+  int maxDigits = 6,
+  int maxDecimals = 3,
+  bool leadingZeros = false,
+}) {
   if (key == Keys.backspace) {
     return current.isEmpty ? current : current.substring(0, current.length - 1);
   }
@@ -34,7 +42,7 @@ String applyKey(String current, String key, {bool allowDecimal = false, int maxD
     if (current.length - dot - 1 >= maxDecimals) return current;
     return current + key;
   }
-  if (current == '0') return key;
+  if (current == '0' && !leadingZeros) return key;
   if (current.length >= maxDigits) return current;
   return current + key;
 }

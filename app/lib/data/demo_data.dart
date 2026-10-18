@@ -3,10 +3,10 @@ import '../core/qty.dart';
 import 'models.dart';
 import 'shop_store.dart';
 
-/// The prototype's demo shop, so every screen has something to show.
-/// Replace with the Firestore-backed store once Firebase is set up.
-ShopStore demoStore({DateTime Function()? clock}) {
-  final now = (clock ?? DateTime.now)();
+/// Sample catalog from the prototype. Also used to seed a brand-new Firebase
+/// shop so the tap grid is not empty before catalog editing exists.
+/// Product ids are fixed so the demo AI scripts can refer to them.
+List<Product> demoProducts() {
   Product p(
     String id,
     String ne,
@@ -34,7 +34,7 @@ ShopStore demoStore({DateTime Function()? clock}) {
     barcode: 'demo-$id',
   );
 
-  final products = [
+  return [
     p('waiwai', 'वाइवाइ', 'Wai Wai', 25, 18, Unit.packet, 6, 12, 'वा', 0xFFF6E3B4, 0xFF6B4A00),
     p('egg', 'अण्डा', 'Egg', 20, 16, Unit.piece, 90, 30, 'अ', 0xFFF3E7DA, 0xFF6A3F17),
     p('milk', 'दूध', 'Milk', 55, 48, Unit.packet, 20, 10, 'दू', 0xFFDCE8F5, 0xFF1E3E73),
@@ -44,6 +44,12 @@ ShopStore demoStore({DateTime Function()? clock}) {
     p('soap', 'साबुन', 'Soap', 60, 45, Unit.piece, 18, 6, 'सा', 0xFFF5DDE6, 0xFF7A1F45),
     p('biscuit', 'बिस्कुट', 'Biscuit', 30, 22, Unit.packet, 40, 12, 'बि', 0xFFF1E2D3, 0xFF6A3F17),
   ];
+}
+
+/// The prototype's demo shop (in memory), so every screen has something to show.
+ShopStore demoStore({DateTime Function()? clock}) {
+  final now = (clock ?? DateTime.now)();
+  final products = demoProducts();
   final byId = {for (final x in products) x.id: x};
 
   final customers = [

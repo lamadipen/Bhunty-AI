@@ -76,7 +76,8 @@ Logo: `brand/` — green rounded tile, a round smiling "Bhunte" face wearing an 
 
 ## Repo layout
 
-- `app/` — Flutter app (Android, iOS, web). Demo data in memory; Firebase not wired yet.
+- `app/` — Flutter app (Android, iOS, web). `flutter run` = in-memory demo; `--dart-define=BACKEND=firebase` = phone login + Firestore.
+- `firestore.rules`, `firebase.json` — Firestore rules; tests in `rules-test/` (local emulator).
 - `brand/` — logo SVGs and exported PNGs.
 - `docs/` — architecture, roadmap, review.
 
@@ -84,3 +85,4 @@ Logo: `brand/` — green rounded tile, a round smiling "Bhunte" face wearing an 
 
 - Money is `int` paisa, quantity is `int` milli-units (`app/lib/core/`). Never `double` for either.
 - All writes go through `ShopStore` methods; AI output is a `ProposedAction` that only `ShopStore.apply()` commits after a user tap.
+- Each `ShopStore` write produces one `ShopChange`, saved by `FirestoreBackend` as one `WriteBatch` with `FieldValue.increment`. Never `runTransaction`, never await a commit (offline-first).

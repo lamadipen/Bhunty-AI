@@ -4,7 +4,7 @@ import '../core/keypad_input.dart';
 import '../theme/theme.dart';
 
 /// Large 3×4 number keypad (principle 4: no text keyboard).
-/// Rows 1–9, then [bottomRow] (e.g. ⌫ 0 ✓, or . 0 ⌫ for kg/litre).
+/// Rows 1–9, then [bottomRow] (e.g. ⌫ 0 ✓, or . 0 ⌫ for kg/litre; '' leaves a gap).
 class Keypad extends StatelessWidget {
   const Keypad({
     super.key,
@@ -34,6 +34,7 @@ class Keypad extends StatelessWidget {
       ),
       itemBuilder: (context, i) {
         final k = keys[i];
+        if (k.isEmpty) return const SizedBox.shrink();
         final isOk = k == Keys.ok;
         final isBack = k == Keys.backspace;
         final bg = isOk ? BColors.green : (isBack ? BColors.warnBg : BColors.ground);

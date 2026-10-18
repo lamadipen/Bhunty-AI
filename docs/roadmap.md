@@ -10,7 +10,8 @@ Gate: ≥ 85 % of voice samples and bill lines parsed correctly; 5-item tap chec
 
 ## Phase 1 — Offline POS core (no AI)
 - [x] Flutter project setup (Android, iOS, web) — `app/`, screens from the prototype on demo data
-- [ ] Firebase project, phone OTP login, Firestore repository behind `ShopStore`
+- [x] Phone OTP login, Firestore backend behind `ShopStore` (batched offline writes), security rules + emulator tests
+- [ ] Create the Firebase project, run `flutterfire configure`, test sign-in on a real phone
 - [ ] Shop setup + product catalog (photo, price, barcode, stock); first-20-items onboarding from a bill photo
 - [ ] Sell screen: favourites grid, barcode scan, cart, quantity keypad
 - [ ] Payment: cash with change calculator, QR (static first), udharo, split payment, discount/round-off

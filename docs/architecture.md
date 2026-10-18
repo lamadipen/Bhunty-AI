@@ -32,11 +32,11 @@ The app never sends a model's output straight to Firestore. Flow for every AI fe
 ## Firestore data model (draft)
 
 ```
-shops/{shopId}
+shops/{shopId}                        # shopId = owner's uid for now (one owner, one shop)
   name, ownerUid, currency: "NPR", createdAt
   products/{productId}
     name_ne, name_en, pricePaisa, costPaisa, barcode?, unit: "pc"|"kg"|"l"|"packet",
-    stockMilli, photoUrl?, isFavourite, lowStockAtMilli
+    stockMilli, photoUrl?, isFavourite, lowStockAtMilli, letter, tileBg, tileInk
   productEmbeddings/{productId}       # kept apart so catalog reads stay small
     vector, model, updatedAt
   sales/{saleId}                      # id generated on device (idempotent sync)
@@ -44,12 +44,12 @@ shops/{shopId}
     subtotalPaisa, discountPaisa, totalPaisa,
     payments: [{method: "cash"|"qr"|"udharo", amountPaisa}],
     tenderedPaisa?, changePaisa?, customerId?,
-    createdAt (client), syncedAt (server), deviceId, voidedAt?
+    createdAt (client), syncedAt (server), day (yyyy-mm-dd, NPT), createdBy (uid), voidedAt?
   stockEntries/{entryId}
     source: "bill_photo" | "product_photo" | "voice" | "manual",
-    photoUrl?, lines: [{productId, qtyMilli, costPaisa}], totalPaisa, createdAt
+    photoUrl?, lines: [{productId, qtyMilli, costPaisa}], totalPaisa, createdAt, createdBy
   customers/{customerId}
-    name, phone?, balancePaisa, lastActivityAt
+    name, initial, phone?, balancePaisa, lastNote, lastActivityAt
     ledger/{entryId}
       type: "credit" | "payment", amountPaisa, saleId?, note?, createdAt
   dailySummaries/{yyyy-mm-dd}         # NPT day; history/reports only
@@ -57,7 +57,9 @@ shops/{shopId}
 ```
 
 Notes:
-- **Offline writes use batched writes with `FieldValue.increment()`**, not `runTransaction` (transactions need the server and fail offline). A sale is one batch: the sale doc, `stockMilli` decrements per product, and for udharo a ledger entry + `balancePaisa` increment.
+- **Offline writes use batched writes with `FieldValue.increment()`**, not `runTransaction` (transactions need the server and fail offline). A sale is one batch: the sale doc, `stockMilli` decrements per product, and for udharo a ledger entry + `balancePaisa` increment. In the app: `ShopStore` builds a `ShopChange`, `FirestoreBackend.commit` turns it into one `WriteBatch` and does not await it (offline it completes only after sync).
+- The app listens to `products`, `customers` and `sales where day == today`; the `day` field makes "today" one equality query on a single-field index.
+- Security rules (`firestore.rules`, tested in `rules-test/`): owner-only access, int money fields, sales/ledger/stockEntries append-only, `dailySummaries` server-only.
 - `stockMilli` and `balancePaisa` are caches. A Cloud Function reconciles them from `stockEntries`/`sales`/`ledger` nightly and flags drift.
 - The Home "today's sales" card is computed on device from today's cached sales, so it is right offline. `dailySummaries` are maintained by a Cloud Function trigger for history and reports (keeps Firestore read costs down).
 - Mistakes are corrected with reversing entries (`voidedAt`, a negative ledger entry), never deletes.

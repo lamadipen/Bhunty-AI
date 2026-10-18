@@ -11,11 +11,13 @@ class AppScope extends InheritedNotifier<ShopStore> {
     required ShopStore store,
     required this.assistant,
     required this.scanner,
+    this.signOut,
     required super.child,
   }) : super(notifier: store);
 
   final AssistantService assistant;
   final BarcodeScanner scanner;
+  final Future<void> Function()? signOut;
 
   static AppScope _of(BuildContext context, {required bool listen}) {
     final scope = listen
@@ -35,4 +37,7 @@ extension AppScopeContext on BuildContext {
 
   AssistantService get assistant => AppScope._of(this, listen: false).assistant;
   BarcodeScanner get scanner => AppScope._of(this, listen: false).scanner;
+
+  /// Null in the demo (nobody is signed in).
+  Future<void> Function()? get signOut => AppScope._of(this, listen: false).signOut;
 }

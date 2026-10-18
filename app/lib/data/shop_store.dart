@@ -5,34 +5,66 @@ import '../core/money.dart';
 import '../core/nepal_time.dart';
 import 'models.dart';
 import 'proposed_action.dart';
+import 'shop_backend.dart';
 
 /// The shop's records and the only place that changes them.
 ///
 /// All money and stock arithmetic happens here, in code (principle 3).
-/// This in-memory version runs the demo; a Firestore-backed version will keep
-/// the same methods and write each one as a single batched write (see
-/// docs/architecture.md — transactions do not work offline).
+/// Each write updates this in-memory copy at once (so the UI never waits) and
+/// hands a [ShopChange] to the [ShopBackend], which saves it as one batched
+/// write. With no backend (the demo) the data lives only in memory.
+/// A backend that listens for remote changes feeds them in with [replaceFromRemote].
 class ShopStore extends ChangeNotifier {
   ShopStore({
-    required this.shopName,
+    required String shopName,
     required List<Product> products,
     required List<Customer> customers,
     List<Sale> sales = const [],
     DateTime Function()? clock,
-  }) : _now = clock ?? DateTime.now,
+    ShopBackend? backend,
+  }) : _shopName = shopName,
+       _now = clock ?? DateTime.now,
+       _backend = backend,
        _products = {for (final p in products) p.id: p},
        _customers = {for (final c in customers) c.id: c},
        _sales = [...sales];
 
-  final String shopName;
+  String _shopName;
   final DateTime Function() _now;
+  final ShopBackend? _backend;
   final Map<String, Product> _products;
   final Map<String, Customer> _customers;
   final List<Sale> _sales;
   final List<LedgerEntry> _ledger = [];
   int _seq = 0;
 
-  String _newId(String prefix) => '$prefix-${_now().microsecondsSinceEpoch}-${++_seq}';
+  String _newId(String prefix) => _backend?.newId() ?? '$prefix-${_now().microsecondsSinceEpoch}-${++_seq}';
+
+  String get shopName => _shopName;
+
+  /// True when changes are saved to a backend (Firebase), false for the in-memory demo.
+  bool get isSynced => _backend != null;
+
+  /// Replaces cached data with what the backend reports. Pass only what changed.
+  void replaceFromRemote({String? shopName, List<Product>? products, List<Customer>? customers, List<Sale>? sales}) {
+    if (shopName != null) _shopName = shopName;
+    if (products != null) {
+      _products
+        ..clear()
+        ..addAll({for (final p in products) p.id: p});
+    }
+    if (customers != null) {
+      _customers
+        ..clear()
+        ..addAll({for (final c in customers) c.id: c});
+    }
+    if (sales != null) {
+      _sales
+        ..clear()
+        ..addAll(sales);
+    }
+    notifyListeners();
+  }
 
   // ---- Reads ----
 
@@ -139,7 +171,7 @@ class ShopStore extends ChangeNotifier {
       case RecordPayment(:final customerId, :final amountPaisa):
         recordPayment(customerId, amountPaisa);
       case AddStock(:final lines):
-        addStock(lines);
+        addStock(lines, source: StockSource.voice);
     }
   }
 
@@ -191,33 +223,53 @@ class ShopStore extends ChangeNotifier {
       // Stock may go below zero when the count was wrong; that is a signal, not an error.
       _products[l.productId] = p.withStock(p.stockMilli - l.qtyMilli);
     }
-    if (method == PaymentMethod.udharo) {
-      _addLedger(customerId!, LedgerType.credit, total, saleId: sale.id, notify: false);
-    }
-    notifyListeners();
+    final ledger = method == PaymentMethod.udharo
+        ? _addLedger(customerId!, LedgerType.credit, total, saleId: sale.id)
+        : null;
+    _commit(
+      ShopChange(
+        sale: sale,
+        stockDeltas: {for (final l in lines) l.productId: -l.qtyMilli},
+        ledger: [?ledger],
+        customerNotes: {if (ledger != null) ledger.customerId: _customers[ledger.customerId]!.lastNote},
+      ),
+    );
     return sale;
   }
 
   void recordCredit(String customerId, int amountPaisa) {
     final problem = validate(RecordCredit(customerId: customerId, amountPaisa: amountPaisa));
     if (problem != null) throw ArgumentError(problem);
-    _addLedger(customerId, LedgerType.credit, amountPaisa);
+    _commitLedger(_addLedger(customerId, LedgerType.credit, amountPaisa));
   }
 
   void recordPayment(String customerId, int amountPaisa) {
     final problem = validate(RecordPayment(customerId: customerId, amountPaisa: amountPaisa));
     if (problem != null) throw ArgumentError(problem);
-    _addLedger(customerId, LedgerType.payment, amountPaisa);
+    _commitLedger(_addLedger(customerId, LedgerType.payment, amountPaisa));
   }
 
-  void addStock(List<StockLine> lines) {
+  void addStock(List<StockLine> lines, {StockSource source = StockSource.manual}) {
     final problem = validate(AddStock(lines: lines));
     if (problem != null) throw ArgumentError(problem);
+    final deltas = <String, int>{};
     for (final l in lines) {
       final p = _products[l.productId]!;
       _products[l.productId] = p.withStock(p.stockMilli + l.qtyMilli);
+      deltas[l.productId] = (deltas[l.productId] ?? 0) + l.qtyMilli;
     }
-    notifyListeners();
+    _commit(
+      ShopChange(
+        stockDeltas: deltas,
+        stockEntry: StockEntry(
+          id: _newId('stock'),
+          source: source,
+          lines: lines,
+          totalPaisa: lines.fold(0, (sum, l) => sum + lineTotal(l.costPaisa, l.qtyMilli)),
+          createdAt: _now(),
+        ),
+      ),
+    );
   }
 
   Customer addCustomer(String name) {
@@ -231,29 +283,37 @@ class ShopStore extends ChangeNotifier {
       lastNote: 'नयाँ ग्राहक',
     );
     _customers[c.id] = c;
-    notifyListeners();
+    _commit(ShopChange(newCustomers: [c]));
     return c;
   }
 
-  void _addLedger(String customerId, LedgerType type, int amountPaisa, {String? saleId, bool notify = true}) {
+  /// Updates the cached balance and returns the entry; the caller commits it.
+  LedgerEntry _addLedger(String customerId, LedgerType type, int amountPaisa, {String? saleId}) {
     final c = _customers[customerId]!;
     final balance = type == LedgerType.credit ? c.balancePaisa + amountPaisa : c.balancePaisa - amountPaisa;
-    _ledger.add(
-      LedgerEntry(
-        id: _newId('ledger'),
-        customerId: customerId,
-        type: type,
-        amountPaisa: amountPaisa,
-        createdAt: _now(),
-        saleId: saleId,
-      ),
+    final entry = LedgerEntry(
+      id: _newId('ledger'),
+      customerId: customerId,
+      type: type,
+      amountPaisa: amountPaisa,
+      createdAt: _now(),
+      saleId: saleId,
     );
+    _ledger.add(entry);
     _customers[customerId] = c.copyWith(
       balancePaisa: balance,
       lastNote: balance == 0
           ? 'सबै तिर्यो'
           : 'आज · ${type == LedgerType.credit ? 'उधारो' : 'तिर्यो'} ${formatRs(amountPaisa)}',
     );
-    if (notify) notifyListeners();
+    return entry;
+  }
+
+  void _commitLedger(LedgerEntry e) =>
+      _commit(ShopChange(ledger: [e], customerNotes: {e.customerId: _customers[e.customerId]!.lastNote}));
+
+  void _commit(ShopChange change) {
+    _backend?.commit(change);
+    notifyListeners();
   }
 }

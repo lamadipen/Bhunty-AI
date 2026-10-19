@@ -11,6 +11,7 @@ The AI backend is still the scripted demo in both modes (Phase 2).
 flutter pub get
 flutter run                                   # demo
 flutter run --dart-define-from-file=firebase.local.json   # Firebase (after setup below)
+flutter run --dart-define=SCANNER=demo        # scripted scanner (no camera needed)
 flutter test
 flutter analyze
 dart run flutter_launcher_icons               # after changing ../brand/ icons
@@ -51,6 +52,7 @@ cd ../rules-test && npm install && npm test
 | 3 · Add stock (bill photo, voice, or by hand) | `lib/screens/stock_screen.dart`, `lib/screens/add_stock_sheet.dart` |
 | New product (not in the prototype) | `lib/screens/new_product_screen.dart` |
 | Print own barcode/QR labels | `lib/screens/label_screen.dart`, `lib/labels/` |
+| Camera scanner + type-the-number | `lib/scanning/` |
 | 4 · Udharo (credit) | `lib/screens/udharo_screen.dart` |
 | 5 · Talk to Bhunte | `lib/screens/assistant_screen.dart` |
 | Reports (हिसाब tile; not in the prototype) | `lib/screens/reports_screen.dart` |
@@ -76,10 +78,15 @@ assets/fonts/  Mukta (bundled so Devanagari works offline; OFL licence included)
 - **Chat answers are built in code** (`ai/answers.dart`) from store data; the model would only pick the metric.
 - **Today is Nepal time** (UTC+5:45) whatever the device timezone.
 - **Own codes are in-store EAN-13 (prefix 2, GS1 restricted circulation)**, so they never clash with real product barcodes. Each product prints its label as a barcode (phone camera *and* laser scanners) or a QR (small/round items). Labels are drawn by Flutter and placed in the PDF as images, because the `pdf` package can't shape Devanagari (`core/barcode.dart`, `labels/`).
+- **Scanning always has a way out.** The camera screen (`mobile_scanner`) shows why it can't scan (permission denied, no camera) with a retry, and "type the number" is always on screen. Typed GTINs must pass the check digit; payment QRs, links and other non-product codes are refused (`core/product_code.dart`). UPC-A is stored as EAN-13 so both scans match.
+- **Own codes are flagged (`ownCode`), not guessed from the 2 prefix.** Hidden products (`archived`) leave grids and searches but keep their history and code; scanning that code offers to show them again.
+- **Editing never writes stock.** `updatedProducts` are saved with merge and without `stockMilli`, so another phone's sales aren't overwritten.
 - **Text keyboard only on the new-product name.** Every number goes through the keypad (`widgets/number_pad.dart`).
 - **No ✓/✕ characters in text** — Mukta has no glyphs for them and there is no offline fallback font. Use `Icons.check_rounded` / `Icons.close_rounded` (e.g. `BigButton(trailingIcon: …)`).
 
 ## Versions
+
+If a web build can't find a plugin (`MissingPluginException` on web), run `flutter clean`: the web plugin registrant can be cached from before the plugin was added.
 
 `image` is pinned below 4.11: 4.11.0 needs a newer `archive` than `pdf` 3.12 allows. `pdf` 3.13+/`printing` 5.15+ need Flutter 3.41; drop the pin when upgrading.
 

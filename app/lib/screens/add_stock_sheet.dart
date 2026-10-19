@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_scope.dart';
 import '../core/keypad_input.dart';
 import '../core/money.dart';
 import '../core/qty.dart';
@@ -9,6 +10,7 @@ import '../widgets/common.dart';
 import '../widgets/keypad.dart';
 import '../widgets/number_pad.dart';
 import 'label_screen.dart';
+import 'new_product_screen.dart';
 
 /// "कति आयो?" — stock arriving for one product, in selling units or packs.
 /// Returns the [StockLine] to add (always in selling units), or null.
@@ -22,7 +24,8 @@ class AddStockSheet extends StatefulWidget {
 }
 
 class _AddStockSheetState extends State<AddStockSheet> {
-  Product get p => widget.product;
+  /// Read live so an edit made from this sheet (✎) shows straight away.
+  late Product p = widget.product;
 
   // Bills are usually in packs, so start there when the product has one.
   late bool _inPacks = p.hasPack;
@@ -77,6 +80,8 @@ class _AddStockSheetState extends State<AddStockSheet> {
 
   @override
   Widget build(BuildContext context) {
+    p = context.store.product(widget.product.id);
+    if (_inPacks && !p.hasPack) _inPacks = false; // pack removed in an edit
     final loose = !_inPacks && p.unit.isLoose;
     final hasQty = _unitsMilli > 0;
     return Column(
@@ -102,6 +107,13 @@ class _AddStockSheetState extends State<AddStockSheet> {
                 ],
               ),
             ),
+            RoundIconButton(
+              icon: Icons.edit_outlined,
+              label: 'सामान मिलाउनुस्',
+              size: 44,
+              onPressed: () => NewProductScreen.edit(context, p),
+            ),
+            const SizedBox(width: 6),
             if (p.hasOwnCode) ...[
               RoundIconButton(
                 icon: Icons.print_outlined,

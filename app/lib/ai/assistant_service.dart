@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart' show BuildContext;
+
 import '../data/models.dart';
 import '../data/proposed_action.dart';
 
@@ -49,8 +51,8 @@ abstract interface class AssistantService {
   Future<List<BillLineProposal>> readBill();
 }
 
-/// On-device barcode scanning (ML Kit in production).
+/// Barcode/QR scanning. The real one opens the camera screen, so it needs a context.
 abstract interface class BarcodeScanner {
-  /// The scanned code, or null if the user cancelled.
-  Future<String?> scan();
+  /// A checked product code (see `checkProductCode`), or null if the user cancelled.
+  Future<String?> scan(BuildContext context);
 }

@@ -18,7 +18,7 @@ class FixedScanner implements BarcodeScanner {
   final String code;
 
   @override
-  Future<String?> scan() async => code;
+  Future<String?> scan(BuildContext context) async => code;
 }
 
 Future<ShopStore> _pumpApp(WidgetTester tester, {BarcodeScanner? scanner, ShopStore? store}) async {
@@ -81,7 +81,7 @@ void main() {
       expect(check(name: '  '), 'सामानको नाम लेख्नुस्');
       expect(check(name: 'चिनी'), 'यो नामको सामान पहिल्यै छ');
       expect(check(price: 0), 'बेच्ने मूल्य लेख्नुस्');
-      expect(check(barcode: 'demo-egg'), 'यो बारकोड अर्को सामानमा छ');
+      expect(check(barcode: 'demo-egg'), 'यो बारकोड "अण्डा" मा छ');
       expect(check(pack: 'बोरा'), isNotNull);
       expect(check(pack: 'बोरा', size: 50 * milli), isNull);
     });

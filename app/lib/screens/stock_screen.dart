@@ -215,6 +215,19 @@ class _StockScreenState extends State<StockScreen> {
             onTap: () => _addManually(p),
           ),
         ),
+        if (store.archivedProducts.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const ValueKey('show-hidden'),
+              icon: const Icon(Icons.visibility_off_outlined, color: BColors.inkSoft),
+              label: Text(
+                'लुकाइएका सामान (${store.archivedProducts.length})',
+                style: const TextStyle(fontSize: 16, color: BColors.inkSoft),
+              ),
+              onPressed: _showHidden,
+            ),
+          ),
         const SizedBox(height: 14),
         const CardBox(
           radius: 18,
@@ -245,10 +258,12 @@ class _StockScreenState extends State<StockScreen> {
 
   Future<void> _scanForStock() async {
     final store = context.readStore;
-    final code = await context.scanner.scan();
+    final code = await context.scanner.scan(context);
     if (code == null || !mounted) return;
     final p = store.productByBarcode(code);
-    if (p != null) {
+    if (p != null && p.archived) {
+      if (await offerUnhide(context, p) && mounted) await _addManually(store.product(p.id));
+    } else if (p != null) {
       await _addManually(p);
     } else {
       showToast(context, 'नयाँ बारकोड · सामानको विवरण भर्नुस्');
@@ -257,6 +272,16 @@ class _StockScreenState extends State<StockScreen> {
   }
 
   Future<void> _newProduct() => NewProductScreen.open(context);
+
+  Future<void> _showHidden() async {
+    final p = await showProductPicker(
+      context,
+      title: 'लुकाइएका सामान',
+      products: context.readStore.archivedProducts,
+      caption: (_) => 'थिचेर फेरि देखाउनुस्',
+    );
+    if (p != null && mounted) await NewProductScreen.edit(context, p);
+  }
 
   Widget _review() {
     final store = context.readStore;

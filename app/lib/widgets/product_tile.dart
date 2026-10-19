@@ -172,9 +172,14 @@ class _MoreTile extends StatelessWidget {
 }
 
 /// Every product in a scrollable grid; returns the one tapped.
-Future<Product?> showProductPicker(BuildContext context, {required String title, String Function(Product)? caption}) {
+Future<Product?> showProductPicker(
+  BuildContext context, {
+  required String title,
+  String Function(Product)? caption,
+  List<Product>? products,
+}) {
   return showBhunteSheet<Product>(context, (c) {
-    final products = c.store.products;
+    final list = products ?? c.store.products;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -196,7 +201,7 @@ Future<Product?> showProductPicker(BuildContext context, {required String title,
           constraints: BoxConstraints(maxHeight: MediaQuery.of(c).size.height * 0.6),
           child: GridView.builder(
             shrinkWrap: true,
-            itemCount: products.length,
+            itemCount: list.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
               mainAxisExtent: 104,
@@ -204,14 +209,44 @@ Future<Product?> showProductPicker(BuildContext context, {required String title,
               mainAxisSpacing: 8,
             ),
             itemBuilder: (_, i) => ProductTile(
-              product: products[i],
-              caption: caption?.call(products[i]),
+              product: list[i],
+              caption: caption?.call(list[i]),
               action: 'छान्नुस्',
-              onTap: () => Navigator.pop(c, products[i]),
+              onTap: () => Navigator.pop(c, list[i]),
             ),
           ),
         ),
       ],
     );
   });
+}
+
+/// Asks whether to show a hidden product again (e.g. when its code is scanned).
+/// Returns true if it is now visible.
+Future<bool> offerUnhide(BuildContext context, Product p) async {
+  final yes = await showBhunteSheet<bool>(
+    context,
+    (c) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('${p.nameNe} लुकाइएको छ', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        const Text('यो कोड लुकाइएको सामानको हो। फेरि देखाउने?', style: TextStyle(fontSize: 16, color: BColors.inkSoft)),
+        const SizedBox(height: 16),
+        BigButton(label: 'फेरि देखाउनुस्', onPressed: () => Navigator.pop(c, true)),
+        const SizedBox(height: 8),
+        BigButton(
+          label: 'रद्द',
+          outlineColor: BColors.line,
+          foreground: BColors.ink,
+          height: 56,
+          fontSize: 18,
+          onPressed: () => Navigator.pop(c, false),
+        ),
+      ],
+    ),
+  );
+  if (yes != true || !context.mounted) return false;
+  context.readStore.setArchived(p.id, false);
+  return true;
 }

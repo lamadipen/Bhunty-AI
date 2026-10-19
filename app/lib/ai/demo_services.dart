@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart' show BuildContext;
+
 import '../core/money.dart';
 import '../core/qty.dart';
 import '../data/models.dart';
@@ -112,7 +114,7 @@ class DemoBarcodeScanner implements BarcodeScanner {
   int _i = 0;
 
   @override
-  Future<String?> scan() async {
+  Future<String?> scan(BuildContext context) async {
     await Future<void>.delayed(delay);
     return _codes[_i++ % _codes.length];
   }

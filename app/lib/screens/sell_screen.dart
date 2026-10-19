@@ -11,6 +11,7 @@ import '../theme/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/keypad.dart';
 import '../widgets/product_tile.dart';
+import 'new_product_screen.dart';
 import 'payment_sheets.dart';
 
 /// Checkout: tap grid → scan → voice (tap first, AI second).
@@ -52,15 +53,53 @@ class _SellScreenState extends State<SellScreen> {
 
   Future<void> _scan() async {
     final store = context.readStore;
-    final code = await context.scanner.scan();
+    final code = await context.scanner.scan(context);
     if (!mounted || code == null) return;
-    final p = store.productByBarcode(code);
+    var p = store.productByBarcode(code);
+    if (p != null && p.archived) {
+      if (!await offerUnhide(context, p) || !mounted) return;
+      p = store.product(p.id);
+    }
     if (p == null) {
-      showToast(context, 'यो बारकोड भेटिएन');
-      return;
+      p = await _offerNewProduct(code);
+      if (p == null || !mounted) return;
     }
     _add(p.id, milli);
     showToast(context, 'स्क्यान भयो: ${p.nameNe} +1');
+  }
+
+  /// Unknown code at the counter: add the product now (form pre-filled with
+  /// the code) and put it in the cart, or carry on without it.
+  Future<Product?> _offerNewProduct(String code) async {
+    final add = await showBhunteSheet<bool>(
+      context,
+      (c) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('यो सामान पसलमा छैन', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text('कोड: $code', style: const TextStyle(fontSize: 16, color: BColors.inkSoft)),
+          const SizedBox(height: 6),
+          const Text(
+            'एक पटक नाम र मूल्य भर्नुस्, अर्को पटकदेखि स्क्यान गर्दा आफैं आउँछ।',
+            style: TextStyle(fontSize: 16, color: BColors.inkSoft, height: 1.35),
+          ),
+          const SizedBox(height: 16),
+          BigButton(label: 'नयाँ सामान थप्नुस्', icon: Icons.add_rounded, onPressed: () => Navigator.pop(c, true)),
+          const SizedBox(height: 8),
+          BigButton(
+            label: 'अहिले होइन',
+            outlineColor: BColors.line,
+            foreground: BColors.ink,
+            height: 56,
+            fontSize: 18,
+            onPressed: () => Navigator.pop(c, false),
+          ),
+        ],
+      ),
+    );
+    if (add != true || !mounted) return null;
+    return NewProductScreen.open(context, barcode: code);
   }
 
   Future<void> _listen() async {

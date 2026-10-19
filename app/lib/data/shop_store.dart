@@ -1,5 +1,8 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
+import '../core/barcode.dart';
 import '../core/cash.dart';
 import '../core/money.dart';
 import '../core/nepal_time.dart';
@@ -280,6 +283,18 @@ class ShopStore extends ChangeNotifier {
     );
   }
 
+  /// Remembers whether this product's own label prints as a barcode or a QR code.
+  void setLabelKind(String productId, LabelKind kind) {
+    final p = product(productId);
+    if (!p.hasOwnCode || p.labelKind == kind) return;
+    _products[productId] = p.copyWith(labelKind: kind);
+    _commit(ShopChange(labelKinds: {productId: kind}));
+  }
+
+  /// A new in-store code that no product in this shop uses yet.
+  String newInStoreCode({Random? random}) =>
+      generateInStoreEan13(taken: {for (final p in _products.values) ?p.barcode}, random: random);
+
   /// Nepali reason a new product can't be added, or null.
   String? validateNewProduct({
     required String nameNe,
@@ -314,6 +329,7 @@ class ShopStore extends ChangeNotifier {
     String? barcode,
     String? packName,
     int? packSizeMilli,
+    LabelKind? labelKind,
   }) {
     final problem = validateNewProduct(
       nameNe: nameNe,
@@ -341,6 +357,7 @@ class ShopStore extends ChangeNotifier {
       barcode: (barcode == null || barcode.isEmpty) ? null : barcode,
       packName: packName,
       packSizeMilli: packName == null ? null : packSizeMilli,
+      labelKind: (barcode != null && isInStoreCode(barcode)) ? (labelKind ?? LabelKind.barcode) : null,
     );
     _products[p.id] = p;
     if (openingStockMilli > 0) {

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/barcode.dart';
 import '../core/nepal_time.dart';
 import '../core/qty.dart';
 import '../data/models.dart';
@@ -23,6 +24,7 @@ Map<String, Object?> productToMap(Product p) => {
   'tileInk': p.tileInk,
   'packName': p.packName,
   'packSizeMilli': p.packSizeMilli,
+  'labelKind': p.labelKind?.name,
 };
 
 Product productFromMap(String id, Map<String, dynamic> m) => Product(
@@ -41,6 +43,7 @@ Product productFromMap(String id, Map<String, dynamic> m) => Product(
   tileInk: _int(m['tileInk'], fallback: 0xFF14512F),
   packName: m['packName'] as String?,
   packSizeMilli: m['packSizeMilli'] as int?,
+  labelKind: LabelKind.values.asNameMap()[m['labelKind']],
 );
 
 Map<String, Object?> customerToMap(Customer c) => {

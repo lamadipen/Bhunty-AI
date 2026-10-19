@@ -16,6 +16,7 @@ Gate: ≥ 85 % of voice samples and bill lines parsed correctly; 5-item tap chec
 - [ ] Turn on phone login, linking the anonymous account so shops keep their data
 - [x] Add stock by hand: tap or scan a product, units or packs (carton/bora), cost; latest cost kept
 - [x] New product form (name typed once; price, cost, unit, pack size, opening stock, low-stock alert, barcode)
+- [x] Shop's own code for products without a barcode (in-store EAN-13, printed as barcode or QR); A4 sticker labels to print or share
 - [ ] Edit a product (price, low-stock alert, pack, favourite/grid order), product photos
 - [ ] Shop setup (name) + first-20-items onboarding from a bill photo
 - [ ] Sell screen: favourites grid, barcode scan, cart, quantity keypad

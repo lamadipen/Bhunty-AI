@@ -1,3 +1,4 @@
+import '../core/barcode.dart';
 import 'models.dart';
 
 enum StockSource {
@@ -39,6 +40,7 @@ class ShopChange {
     this.newCustomers = const [],
     this.newProducts = const [],
     this.costUpdates = const {},
+    this.labelKinds = const {},
     this.stockEntry,
   });
 
@@ -59,6 +61,9 @@ class ShopChange {
 
   /// productId → latest cost per selling unit (from the newest stock entry).
   final Map<String, int> costUpdates;
+
+  /// productId → how its own label is printed.
+  final Map<String, LabelKind> labelKinds;
   final StockEntry? stockEntry;
 }
 

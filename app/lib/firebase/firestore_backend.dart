@@ -60,6 +60,7 @@ class FirestoreBackend implements ShopBackend {
       (id, delta) => productFields.putIfAbsent(id, () => {})['stockMilli'] = FieldValue.increment(delta),
     );
     c.costUpdates.forEach((id, cost) => productFields.putIfAbsent(id, () => {})['costPaisa'] = cost);
+    c.labelKinds.forEach((id, kind) => productFields.putIfAbsent(id, () => {})['labelKind'] = kind.name);
     productFields.forEach((id, fields) => batch.update(_products.doc(id), fields));
     for (final nc in c.newCustomers) {
       batch.set(_customers.doc(nc.id), {...customerToMap(nc), 'createdAt': FieldValue.serverTimestamp()});

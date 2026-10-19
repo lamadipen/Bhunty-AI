@@ -1,3 +1,4 @@
+import '../core/barcode.dart';
 import '../core/money.dart';
 import '../core/qty.dart';
 
@@ -18,6 +19,7 @@ class Product {
     this.isFavourite = true,
     this.packName,
     this.packSizeMilli,
+    this.labelKind,
   });
 
   final String id;
@@ -39,6 +41,12 @@ class Product {
   final int? packSizeMilli;
 
   bool get hasPack => packName != null && (packSizeMilli ?? 0) > 0;
+
+  /// Set when the shop made its own code for this product: how its label is printed.
+  final LabelKind? labelKind;
+
+  /// The code was made by this app (in-store EAN-13), so the shop prints its labels.
+  bool get hasOwnCode => barcode != null && isInStoreCode(barcode!);
 
   /// Picture-grid placeholder until product photos exist: short Devanagari
   /// letters on a tinted tile (ARGB colours, so the data layer stays Flutter-free).
@@ -66,9 +74,10 @@ class Product {
     isFavourite: isFavourite,
     packName: name,
     packSizeMilli: sizeMilli,
+    labelKind: labelKind,
   );
 
-  Product copyWith({int? stockMilli, int? costPaisa}) => Product(
+  Product copyWith({int? stockMilli, int? costPaisa, LabelKind? labelKind}) => Product(
     id: id,
     nameNe: nameNe,
     nameEn: nameEn,
@@ -84,6 +93,7 @@ class Product {
     isFavourite: isFavourite,
     packName: packName,
     packSizeMilli: packSizeMilli,
+    labelKind: labelKind ?? this.labelKind,
   );
 }
 

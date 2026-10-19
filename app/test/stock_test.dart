@@ -192,12 +192,20 @@ void main() {
       await tester.tap(find.text('स्क्यान'));
       await tester.pumpAndSettle();
       expect(find.text('नयाँ सामान'), findsWidgets);
-      await tester.scrollUntilVisible(find.text('8901234567890'), 200, scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        find.text('8901234567890'),
+        200,
+        scrollable: find
+            .descendant(of: find.byKey(const ValueKey('new-product-list')), matching: find.byType(Scrollable))
+            .first,
+      );
       expect(find.text('8901234567890'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('name-ne')),
         -200,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(of: find.byKey(const ValueKey('new-product-list')), matching: find.byType(Scrollable))
+            .first,
       );
 
       // Saving without a name is caught.
@@ -211,7 +219,13 @@ void main() {
       await tester.tap(find.text('प्याकेट').first);
       await tester.pump();
       Future<void> fill(String field, String digits) async {
-        await tester.scrollUntilVisible(find.byKey(ValueKey(field)), 120, scrollable: find.byType(Scrollable).first);
+        await tester.scrollUntilVisible(
+          find.byKey(ValueKey(field)),
+          120,
+          scrollable: find
+              .descendant(of: find.byKey(const ValueKey('new-product-list')), matching: find.byType(Scrollable))
+              .first,
+        );
         await tester.tap(find.byKey(ValueKey(field)));
         await tester.pumpAndSettle();
         await _tapKeys(tester, digits);
@@ -226,7 +240,9 @@ void main() {
       await tester.scrollUntilVisible(
         find.text('नाफा: रु 5 प्रति प्याकेट'),
         120,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find
+            .descendant(of: find.byKey(const ValueKey('new-product-list')), matching: find.byType(Scrollable))
+            .first,
       );
       expect(find.text('नाफा: रु 5 प्रति प्याकेट'), findsOneWidget);
       await fill('field-opening', '10');

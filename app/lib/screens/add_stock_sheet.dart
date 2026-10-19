@@ -8,6 +8,7 @@ import '../theme/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/keypad.dart';
 import '../widgets/number_pad.dart';
+import 'label_screen.dart';
 
 /// "कति आयो?" — stock arriving for one product, in selling units or packs.
 /// Returns the [StockLine] to add (always in selling units), or null.
@@ -101,6 +102,15 @@ class _AddStockSheetState extends State<AddStockSheet> {
                 ],
               ),
             ),
+            if (p.hasOwnCode) ...[
+              RoundIconButton(
+                icon: Icons.print_outlined,
+                label: 'लेबल प्रिन्ट',
+                size: 44,
+                onPressed: () => Navigator.of(context).push(LabelScreen.route<void>(p.id)),
+              ),
+              const SizedBox(width: 6),
+            ],
             RoundIconButton(
               icon: Icons.close_rounded,
               label: 'बन्द गर्नुस्',

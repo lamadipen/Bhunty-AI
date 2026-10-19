@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+import '../core/barcode.dart';
 import '../core/money.dart';
 import '../core/qty.dart';
 import '../data/models.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
+import '../labels/product_label.dart';
 import '../widgets/number_pad.dart';
+import 'label_screen.dart';
 
 /// Adds a product to the catalog. The name is typed once — the only text
 /// keyboard in the app — until voice/photo naming arrives (Phase 2).
@@ -37,6 +40,10 @@ class _NewProductScreenState extends State<NewProductScreen> {
   String? _packName;
   String _packSize = '';
   late String? _barcode = widget.barcode;
+  LabelKind _labelKind = LabelKind.barcode;
+
+  /// The code was generated here (no barcode on the packet).
+  bool get _ownCode => _barcode != null && isInStoreCode(_barcode!);
   String? _error;
 
   @override
@@ -53,6 +60,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
     bool money = false,
     bool decimal = false,
   }) async {
+    _closeKeyboard();
     final text = await showNumberPad(
       context,
       title: title,
@@ -65,12 +73,22 @@ class _NewProductScreenState extends State<NewProductScreen> {
     if (text != null) setState(() => set(text));
   }
 
+  /// The name keyboard goes away as soon as the user moves on to tap fields.
+  void _closeKeyboard() => FocusScope.of(context).unfocus();
+
   Future<void> _scan() async {
+    _closeKeyboard();
     final code = await context.scanner.scan();
     if (code != null && mounted) setState(() => _barcode = code);
   }
 
+  void _generate() {
+    _closeKeyboard();
+    setState(() => _barcode = context.readStore.newInStoreCode());
+  }
+
   void _save() {
+    _closeKeyboard();
     final store = context.readStore;
     final price = parseMoneyPaisa(_price);
     final cost = parseMoneyPaisa(_cost);
@@ -98,9 +116,15 @@ class _NewProductScreenState extends State<NewProductScreen> {
       barcode: _barcode,
       packName: _packName,
       packSizeMilli: packSize,
+      labelKind: _labelKind,
     );
     showToast(context, '${product.nameNe} थपियो');
-    Navigator.pop(context, product);
+    if (product.hasOwnCode) {
+      // Its own code is only useful once it's stuck on the product: go straight to printing.
+      Navigator.pushReplacement(context, LabelScreen.route<Product>(product.id), result: product);
+    } else {
+      Navigator.pop(context, product);
+    }
   }
 
   @override
@@ -114,6 +138,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
             const ScreenHeader(title: 'नयाँ सामान', subtitle: 'एक पटक भर्नुस्, सधैं काम लाग्छ'),
             Expanded(
               child: ListView(
+                key: const ValueKey('new-product-list'),
                 padding: const EdgeInsets.all(16),
                 children: [
                   _label('सामानको नाम'),
@@ -229,15 +254,97 @@ class _NewProductScreenState extends State<NewProductScreen> {
                   ],
                   const SizedBox(height: 16),
                   _label('बारकोड'),
-                  if (_barcode == null)
-                    BigButton(
-                      label: 'बारकोड स्क्यान गर्नुस् (नभए पनि हुन्छ)',
-                      icon: Icons.qr_code_scanner_rounded,
-                      outlineColor: BColors.line,
-                      foreground: BColors.ink,
-                      height: 56,
-                      fontSize: 17,
-                      onPressed: _scan,
+                  if (_barcode == null) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: BigButton(
+                            label: 'स्क्यान',
+                            icon: Icons.qr_code_scanner_rounded,
+                            outlineColor: BColors.line,
+                            foreground: BColors.ink,
+                            height: 56,
+                            fontSize: 17,
+                            onPressed: _scan,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: BigButton(
+                            key: const ValueKey('make-own-code'),
+                            label: 'आफ्नै कोड',
+                            icon: Icons.qr_code_2_rounded,
+                            outlineColor: BColors.green,
+                            foreground: BColors.green,
+                            height: 56,
+                            fontSize: 17,
+                            onPressed: _generate,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'प्याकेटमा बारकोड छैन? आफ्नै बारकोड वा QR बनाएर टाँस्नुस्। नभए पनि हुन्छ।',
+                      style: TextStyle(fontSize: 14, color: BColors.inkSoft),
+                    ),
+                  ] else if (_ownCode)
+                    CardBox(
+                      radius: 16,
+                      borderColor: BColors.green,
+                      borderWidth: 2,
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'पसलको आफ्नै कोड',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: BColors.greenDark),
+                                ),
+                              ),
+                              RoundIconButton(
+                                icon: Icons.close_rounded,
+                                label: 'कोड हटाउनुस्',
+                                size: 44,
+                                onPressed: () => setState(() => _barcode = null),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Center(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(border: Border.all(color: BColors.line)),
+                              child: FittedBox(
+                                child: ProductLabel(
+                                  nameNe: _nameNe.text.trim().isEmpty ? 'सामानको नाम' : _nameNe.text.trim(),
+                                  priceText: _price.isEmpty
+                                      ? 'रु —'
+                                      : '${formatRs(price)}${_unit.isLoose ? '/${_unit.ne}' : ''}',
+                                  code: _barcode!,
+                                  kind: _labelKind,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _choices<LabelKind>(
+                            values: LabelKind.values,
+                            selected: _labelKind,
+                            label: (k) => k == LabelKind.barcode ? 'बारकोड' : 'QR',
+                            onPick: (k) => setState(() => _labelKind = k),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _labelKind == LabelKind.barcode
+                                ? 'बारकोड: फोनको क्यामेरा र दोकानको स्क्यानर दुवैले पढ्छ।'
+                                : 'QR: सानो वा गोलो सामानमा राम्रो; फोनको क्यामेराले जुनसुकै कोणबाट पढ्छ।',
+                            style: const TextStyle(fontSize: 14, color: BColors.inkSoft),
+                          ),
+                        ],
+                      ),
                     )
                   else
                     CardBox(
@@ -301,7 +408,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
     key: key,
     controller: c,
     textInputAction: TextInputAction.done,
-    onChanged: (_) => _error == null ? null : setState(() => _error = null),
+    onChanged: (_) => setState(() => _error = null), // also refreshes the label preview
     style: TextStyle(fontSize: big ? 22 : 17, fontWeight: big ? FontWeight.w700 : FontWeight.w400),
     decoration: InputDecoration(
       hintText: hint,
@@ -344,7 +451,10 @@ class _NewProductScreenState extends State<NewProductScreen> {
             ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: () => onPick(v),
+              onTap: () {
+                _closeKeyboard();
+                onPick(v);
+              },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: SizedBox(

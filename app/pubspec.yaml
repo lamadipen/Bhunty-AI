@@ -13,6 +13,9 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_auth: ^6.7.0
   cloud_firestore: ^6.10.0
+  barcode_widget: ^2.0.4
+  pdf: ^3.12.0
+  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:
@@ -20,6 +23,9 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
   fake_cloud_firestore: ^4.3.0
+  # Not used directly. image 4.11.0 calls an archive API newer than pdf 3.12 allows
+  # (archive <4.1); remove this pin when moving to Flutter 3.41+ / pdf 3.13.
+  image: ">=4.10.0 <4.11.0"
 
 flutter:
   uses-material-design: true

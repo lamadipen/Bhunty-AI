@@ -24,9 +24,11 @@ service cloud.firestore {
       match /products/{productId} {
         allow read: if isOwner(shopId);
         allow create, update: if isOwner(shopId)
+          && incoming().name_ne is string && incoming().name_ne.size() > 0
           && incoming().pricePaisa is int
           && incoming().costPaisa is int
-          && incoming().stockMilli is int;
+          && incoming().stockMilli is int
+          && (incoming().get('packSizeMilli', null) == null || incoming().packSizeMilli is int);
         allow delete: if false;
       }
 

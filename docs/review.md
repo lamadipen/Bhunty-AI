@@ -22,7 +22,7 @@ Items marked ✅ are already handled in the Flutter scaffold (`app/`) or in thes
 10. **QR confirmation is manual.** With a static QR the shopkeeper taps "पैसा आयो ✓" on trust; fake payment screenshots are a known fraud in Nepal. Keep it in Phase 1 but label it clearly, and prioritise Fonepay dynamic QR with server-side confirmation.
 11. **New customers from voice.** `record_credit(newCustomerName)` will create "राम", "राम दाइ", "Ram dai" as three people. The confirm card must show *"नयाँ ग्राहक"* explicitly and offer the closest existing matches first.
 12. **Customer consent & privacy.** Udharo stores names, phones and debts of third parties. Nepal's Individual Privacy Act 2075 applies; add a short consent line before sending Viber/SMS reminders and a data export/delete path.
-13. **Pack sizes.** Wholesale bills say "वाइवाइ कार्टुन × 2" but the shop sells packets. Products need a `packSize` (1 carton = 30 packets) so bill lines convert to selling units; the bill review row should show both.
+13. **Pack sizes.** Wholesale bills say "वाइवाइ कार्टुन × 2" but the shop sells packets. Products need a `packSize` (1 carton = 30 packets) so bill lines convert to selling units; the bill review row should show both. ✅ products have `packName`/`packSizeMilli`; manual add-stock takes packs. Bill review still to do.
 14. **Onboarding is the real first-run problem.** An empty catalog means the tap grid is empty. Plan "add your first 20 items in 5 minutes" (bill photo → catalog) as a Phase 1 deliverable, not Phase 3.
 
 ## P2 — engineering details

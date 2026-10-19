@@ -14,7 +14,10 @@ Gate: ≥ 85 % of voice samples and bill lines parsed correctly; 5-item tap chec
 - [x] Automatic anonymous sign-in (phone OTP login built, off behind `PHONE_LOGIN`)
 - [ ] Create the Firebase project, run `flutterfire configure`, test on a real phone
 - [ ] Turn on phone login, linking the anonymous account so shops keep their data
-- [ ] Shop setup + product catalog (photo, price, barcode, stock); first-20-items onboarding from a bill photo
+- [x] Add stock by hand: tap or scan a product, units or packs (carton/bora), cost; latest cost kept
+- [x] New product form (name typed once; price, cost, unit, pack size, opening stock, low-stock alert, barcode)
+- [ ] Edit a product (price, low-stock alert, pack, favourite/grid order), product photos
+- [ ] Shop setup (name) + first-20-items onboarding from a bill photo
 - [ ] Sell screen: favourites grid, barcode scan, cart, quantity keypad
 - [ ] Payment: cash with change calculator, QR (static first), udharo, split payment, discount/round-off
 - [ ] Void a sale (reversing entry); kg/litre quantities on the keypad

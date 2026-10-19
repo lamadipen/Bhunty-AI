@@ -1,3 +1,4 @@
+import '../core/money.dart';
 import '../core/qty.dart';
 
 class Product {
@@ -15,6 +16,8 @@ class Product {
     required this.tileInk,
     this.barcode,
     this.isFavourite = true,
+    this.packName,
+    this.packSizeMilli,
   });
 
   final String id;
@@ -30,6 +33,13 @@ class Product {
   final String? barcode;
   final bool isFavourite;
 
+  /// How the wholesaler sells it, e.g. "कार्टुन" holding 30 packets
+  /// ([packSizeMilli] = 30000). Stock is always kept in selling units.
+  final String? packName;
+  final int? packSizeMilli;
+
+  bool get hasPack => packName != null && (packSizeMilli ?? 0) > 0;
+
   /// Picture-grid placeholder until product photos exist: short Devanagari
   /// letters on a tinted tile (ARGB colours, so the data layer stays Flutter-free).
   final String letter;
@@ -38,7 +48,9 @@ class Product {
 
   bool get isLow => stockMilli <= lowStockAtMilli;
 
-  Product withStock(int stockMilli) => Product(
+  Product withStock(int stockMilli) => copyWith(stockMilli: stockMilli);
+
+  Product withPack(String name, int sizeMilli) => Product(
     id: id,
     nameNe: nameNe,
     nameEn: nameEn,
@@ -52,6 +64,26 @@ class Product {
     tileInk: tileInk,
     barcode: barcode,
     isFavourite: isFavourite,
+    packName: name,
+    packSizeMilli: sizeMilli,
+  );
+
+  Product copyWith({int? stockMilli, int? costPaisa}) => Product(
+    id: id,
+    nameNe: nameNe,
+    nameEn: nameEn,
+    pricePaisa: pricePaisa,
+    costPaisa: costPaisa ?? this.costPaisa,
+    unit: unit,
+    stockMilli: stockMilli ?? this.stockMilli,
+    lowStockAtMilli: lowStockAtMilli,
+    letter: letter,
+    tileBg: tileBg,
+    tileInk: tileInk,
+    barcode: barcode,
+    isFavourite: isFavourite,
+    packName: packName,
+    packSizeMilli: packSizeMilli,
   );
 }
 
@@ -144,13 +176,19 @@ class Sale {
 }
 
 class StockLine {
-  const StockLine({required this.productId, required this.qtyMilli, required this.costPaisa});
+  StockLine({required this.productId, required this.qtyMilli, required this.costPaisa, int? totalCostPaisa})
+    : totalCostPaisa = totalCostPaisa ?? lineTotal(costPaisa, qtyMilli);
 
   final String productId;
+
+  /// In selling units, even when entered as packs.
   final int qtyMilli;
 
-  /// Cost per one unit, from the bill.
+  /// Cost per one selling unit (rounded when it came from a pack price).
   final int costPaisa;
+
+  /// What the line cost in total, exactly as on the bill (e.g. 2 cartons × रु 900).
+  final int totalCostPaisa;
 }
 
 /// One line the AI read from a wholesaler bill. Not stock until the user ticks it.

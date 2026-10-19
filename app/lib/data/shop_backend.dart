@@ -37,6 +37,8 @@ class ShopChange {
     this.ledger = const [],
     this.customerNotes = const {},
     this.newCustomers = const [],
+    this.newProducts = const [],
+    this.costUpdates = const {},
     this.stockEntry,
   });
 
@@ -51,6 +53,12 @@ class ShopChange {
   /// customerId → new "last activity" line for the udharo list.
   final Map<String, String> customerNotes;
   final List<Customer> newCustomers;
+
+  /// Created with zero stock; opening stock arrives through [stockDeltas].
+  final List<Product> newProducts;
+
+  /// productId → latest cost per selling unit (from the newest stock entry).
+  final Map<String, int> costUpdates;
   final StockEntry? stockEntry;
 }
 

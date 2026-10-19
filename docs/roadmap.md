@@ -21,6 +21,7 @@ Gate: ≥ 85 % of voice samples and bill lines parsed correctly; 5-item tap chec
 - [x] Edit a product (name, prices, unit while no stock, pack, low-stock, code: scan / own / remove), hide/unhide, reprint prompt
 - [x] Unknown code on Sell offers to add the product; hidden product's code offers to show it again
 - [x] Labels: show-price switch; A4 sheet or thermal 50×30
+- [ ] Stock in batches (own cost + sale price each), price history, latest price wins; optional supplier/bill no. — spec and scenarios in `docs/product-addition.md` (in review)
 - [ ] Product photos; choosing what's on the Sell grid; stock count correction; several codes per product
 - [ ] Shop setup (name) + first-20-items onboarding from a bill photo
 - [ ] Sell screen: favourites grid, barcode scan, cart, quantity keypad

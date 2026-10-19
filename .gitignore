@@ -125,3 +125,7 @@ firestore-debug.log
 ui-debug.log
 firebase-debug.log
 .firebase/
+
+# Firebase app config (each developer runs `flutterfire configure`)
+app/android/app/google-services.json
+app/ios/Runner/GoogleService-Info.plist

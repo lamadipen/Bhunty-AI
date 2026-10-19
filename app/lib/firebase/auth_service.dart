@@ -32,6 +32,11 @@ abstract interface class AuthService {
 
   Future<void> confirmCode(OtpRequest request, String code);
 
+  /// Signs in with no login screen. The account lives on this device only;
+  /// when phone login is added, link it to the phone number (`linkWithCredential`)
+  /// so the same uid — and the same shop — carries over.
+  Future<void> signInAnonymously();
+
   Future<void> signOut();
 }
 
@@ -89,6 +94,15 @@ class FirebaseAuthService implements AuthService {
   }
 
   @override
+  Future<void> signInAnonymously() async {
+    try {
+      await _auth.signInAnonymously();
+    } on FirebaseAuthException catch (e) {
+      throw _failure(e);
+    }
+  }
+
+  @override
   Future<void> signOut() => _auth.signOut();
 
   static AuthFailure _failure(FirebaseAuthException e) {
@@ -99,6 +113,7 @@ class FirebaseAuthService implements AuthService {
       'session-expired' || 'code-expired' => 'कोडको समय सकियो, फेरि पठाउनुस्',
       'too-many-requests' || 'quota-exceeded' => 'धेरै पटक प्रयास भयो, केही बेरपछि गर्नुस्',
       'network-request-failed' => 'इन्टरनेट छैन। जोडेर फेरि गर्नुस्',
+      'operation-not-allowed' => 'Firebase मा यो लगइन तरिका खुलेको छैन (Authentication → Sign-in method)',
       _ => 'लगइन हुन सकेन, फेरि प्रयास गर्नुस्',
     });
   }

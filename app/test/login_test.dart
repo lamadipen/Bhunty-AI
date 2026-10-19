@@ -12,8 +12,12 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Signs in when the code is 012345.
+/// Signs in when the code is 012345, or anonymously (failing [anonFailures] times first).
 class FakeAuth implements AuthService {
+  FakeAuth({this.anonFailures = 0});
+
+  int anonFailures;
+  int anonCalls = 0;
   final _users = StreamController<String?>.broadcast();
   final sentTo = <String>[];
   String? _uid;
@@ -34,6 +38,17 @@ class FakeAuth implements AuthService {
   Future<void> confirmCode(OtpRequest request, String code) async {
     if (code != '012345') throw const AuthFailure('कोड मिलेन, फेरि हेर्नुस्');
     _uid = 'owner-1';
+    _users.add(_uid);
+  }
+
+  @override
+  Future<void> signInAnonymously() async {
+    anonCalls++;
+    if (anonFailures > 0) {
+      anonFailures--;
+      throw const AuthFailure('इन्टरनेट छैन। जोडेर फेरि गर्नुस्');
+    }
+    _uid = 'anon-1';
     _users.add(_uid);
   }
 
@@ -85,7 +100,37 @@ void main() {
     expect(auth.sentTo, isEmpty);
   });
 
-  testWidgets('sign in, shop opens from Firestore, sign out returns to login', (tester) async {
+  testWidgets('default: signs in anonymously and opens the shop with no login screen', (tester) async {
+    _phoneSize(tester);
+    final auth = FakeAuth(anonFailures: 1);
+    final db = FakeFirebaseFirestore();
+    await tester.pumpWidget(
+      FirebaseRoot(
+        auth: auth,
+        openShop: (uid) => openFirestoreShop(db: db, uid: uid),
+        assistant: DemoAssistantService(delay: Duration.zero),
+        scanner: DemoBarcodeScanner(delay: Duration.zero),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // First attempt fails (offline): a retry screen, never the phone screen.
+    expect(find.text('सुरु गर्न सकिएन'), findsOneWidget);
+    expect(find.text('तपाईंको मोबाइल नम्बर'), findsNothing);
+
+    await tester.tap(find.text('फेरि प्रयास गर्नुस्'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pumpAndSettle();
+    expect(auth.anonCalls, 2);
+    expect(find.text('मेरो पसल'), findsOneWidget);
+    expect((await db.doc('shops/anon-1').get()).exists, isTrue);
+
+    // Anonymous accounts can't sign back in, so there is no sign-out button.
+    await tester.tap(find.byTooltip('पसल · Shop'));
+    await tester.pumpAndSettle();
+    expect(find.text('बाहिर निस्कनुस् · Sign out'), findsNothing);
+  });
+
+  testWidgets('phone login (flag on): sign in, shop opens, sign out returns to login', (tester) async {
     _phoneSize(tester);
     final auth = FakeAuth();
     final db = FakeFirebaseFirestore();
@@ -95,6 +140,7 @@ void main() {
         openShop: (uid) => openFirestoreShop(db: db, uid: uid),
         assistant: DemoAssistantService(delay: Duration.zero),
         scanner: DemoBarcodeScanner(delay: Duration.zero),
+        phoneLogin: true,
       ),
     );
     await tester.pumpAndSettle();

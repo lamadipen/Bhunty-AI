@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'ai/demo_services.dart';
@@ -12,9 +13,13 @@ import 'firebase/firestore_backend.dart';
 import 'firebase_options.dart';
 
 /// `demo` (default): in-memory demo shop, no login.
-/// `firebase`: phone login and the shop saved in Firestore —
+/// `firebase`: the shop saved in Firestore —
 /// `flutter run --dart-define=BACKEND=firebase` (after `flutterfire configure`).
 const _backend = String.fromEnvironment('BACKEND', defaultValue: 'demo');
+
+/// Phone OTP login is built but off for now; the app signs in anonymously.
+/// Turn on with `--dart-define=PHONE_LOGIN=true`.
+const _phoneLogin = bool.fromEnvironment('PHONE_LOGIN');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +33,15 @@ Future<void> main() async {
   }
 
   try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    FirebaseOptions? options;
+    try {
+      options = DefaultFirebaseOptions.currentPlatform;
+    } on UnsupportedError {
+      // No generated options file: Android/iOS can still start from
+      // google-services.json / GoogleService-Info.plist. Web cannot.
+      if (kIsWeb) rethrow;
+    }
+    await Firebase.initializeApp(options: options);
   } catch (e) {
     runApp(ShellApp(home: FirebaseSetupProblem(error: e)));
     return;
@@ -43,6 +56,7 @@ Future<void> main() async {
       openShop: (uid) => openFirestoreShop(db: db, uid: uid),
       assistant: assistant,
       scanner: scanner,
+      phoneLogin: _phoneLogin,
     ),
   );
 }

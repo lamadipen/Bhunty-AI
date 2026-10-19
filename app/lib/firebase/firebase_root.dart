@@ -14,7 +14,8 @@ import 'firestore_backend.dart';
 /// Opens the signed-in user's shop. Injected so tests can pass a fake Firestore.
 typedef ShopOpener = Future<(ShopStore, FirestoreBackend)> Function(String uid);
 
-/// Signed out → login. Signed in → open the shop, then the normal app.
+/// Signed out → sign in (anonymously, or the phone login screen when
+/// [phoneLogin] is on). Signed in → open the shop, then the normal app.
 class FirebaseRoot extends StatefulWidget {
   const FirebaseRoot({
     super.key,
@@ -22,12 +23,16 @@ class FirebaseRoot extends StatefulWidget {
     required this.openShop,
     required this.assistant,
     required this.scanner,
+    this.phoneLogin = false,
   });
 
   final AuthService auth;
   final ShopOpener openShop;
   final AssistantService assistant;
   final BarcodeScanner scanner;
+
+  /// Off for now: the app signs in anonymously with no screen.
+  final bool phoneLogin;
 
   @override
   State<FirebaseRoot> createState() => _FirebaseRootState();
@@ -40,6 +45,7 @@ class _FirebaseRootState extends State<FirebaseRoot> {
   ShopStore? _store;
   FirestoreBackend? _backend;
   Object? _error;
+  String? _signInError;
   int _opening = 0;
 
   @override
@@ -56,7 +62,23 @@ class _FirebaseRootState extends State<FirebaseRoot> {
       _uid = uid;
       _error = null;
     });
-    if (uid != null) _open(uid);
+    if (uid != null) {
+      _open(uid);
+    } else if (!widget.phoneLogin) {
+      _signInAnonymously();
+    }
+  }
+
+  Future<void> _signInAnonymously() async {
+    setState(() => _signInError = null);
+    try {
+      await widget.auth.signInAnonymously(); // the auth stream then opens the shop
+    } on AuthFailure catch (e) {
+      if (mounted) setState(() => _signInError = e.messageNe);
+    } catch (e) {
+      debugPrint('Bhunte: anonymous sign-in failed: $e');
+      if (mounted) setState(() => _signInError = 'इन्टरनेट जोडेर फेरि प्रयास गर्नुस्');
+    }
   }
 
   Future<void> _open(String uid) async {
@@ -99,14 +121,24 @@ class _FirebaseRootState extends State<FirebaseRoot> {
   @override
   Widget build(BuildContext context) {
     if (!_known) return const ShellApp(home: _Waiting(text: ''));
-    if (_uid == null) return ShellApp(home: LoginScreen(auth: widget.auth));
+    if (_uid == null && widget.phoneLogin) return ShellApp(home: LoginScreen(auth: widget.auth));
+    if (_uid == null) {
+      final problem = _signInError;
+      return ShellApp(
+        home: problem == null
+            ? const _Waiting(text: 'सुरु हुँदैछ…')
+            : _Problem(title: 'सुरु गर्न सकिएन', detail: problem, onRetry: _signInAnonymously),
+      );
+    }
+    // An anonymous account can't be signed back into, so only phone users may sign out.
+    final signOut = widget.phoneLogin ? widget.auth.signOut : null;
     if (_error != null) {
       return ShellApp(
         home: _Problem(
           title: 'पसल खोल्न सकिएन',
           detail: 'पहिलो पटक खोल्दा इन्टरनेट चाहिन्छ। जोडेर फेरि प्रयास गर्नुस्।',
           onRetry: () => _open(_uid!),
-          onSignOut: widget.auth.signOut,
+          onSignOut: signOut,
         ),
       );
     }
@@ -117,7 +149,7 @@ class _FirebaseRootState extends State<FirebaseRoot> {
       store: store,
       assistant: widget.assistant,
       scanner: widget.scanner,
-      signOut: widget.auth.signOut,
+      signOut: signOut,
     );
   }
 }

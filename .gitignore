@@ -126,6 +126,10 @@ ui-debug.log
 firebase-debug.log
 .firebase/
 
-# Firebase app config (each developer runs `flutterfire configure`)
+# Project-specific Firebase config stays local (see app/README.md)
 app/android/app/google-services.json
 app/ios/Runner/GoogleService-Info.plist
+app/lib/firebase_options.dart
+app/firebase.local.json
+app/firebase.json
+.firebaserc

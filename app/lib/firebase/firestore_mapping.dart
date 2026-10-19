@@ -125,6 +125,16 @@ Map<String, Object?> stockEntryToMap(StockEntry e, {required String createdBy}) 
   'createdBy': createdBy,
 };
 
+/// Tap-grid order: `sortOrder` first (missing = last), then English name.
+int compareProductDocs(DocumentSnapshot<Map<String, dynamic>> a, DocumentSnapshot<Map<String, dynamic>> b) {
+  final byOrder = _int(
+    a.data()?['sortOrder'],
+    fallback: 1 << 30,
+  ).compareTo(_int(b.data()?['sortOrder'], fallback: 1 << 30));
+  if (byOrder != 0) return byOrder;
+  return (a.data()?['name_en'] as String? ?? '').compareTo(b.data()?['name_en'] as String? ?? '');
+}
+
 int _int(Object? v, {int fallback = 0}) => v is int ? v : (v is num ? v.round() : fallback);
 
 String _firstLetters(String name) => String.fromCharCodes(name.runes.take(2));

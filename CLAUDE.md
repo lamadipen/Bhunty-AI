@@ -76,7 +76,7 @@ Logo: `brand/` — green rounded tile, a round smiling "Bhunte" face wearing an 
 
 ## Repo layout
 
-- `app/` — Flutter app (Android, iOS, web). `flutter run` = in-memory demo; `--dart-define=BACKEND=firebase` = Firestore with automatic anonymous sign-in (phone OTP login built but off: `PHONE_LOGIN=true`).
+- `app/` — Flutter app (Android, iOS, web). `flutter run` = in-memory demo; `--dart-define-from-file=firebase.local.json` (local, git-ignored) = Firestore with automatic anonymous sign-in (phone OTP login built but off: `PHONE_LOGIN=true`).
 - `firestore.rules`, `firebase.json` — Firestore rules; tests in `rules-test/` (local emulator).
 - `brand/` — logo SVGs and exported PNGs.
 - `docs/` — architecture, roadmap, review.

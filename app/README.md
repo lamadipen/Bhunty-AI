@@ -10,7 +10,7 @@ The AI backend is still the scripted demo in both modes (Phase 2).
 ```bash
 flutter pub get
 flutter run                                   # demo
-flutter run --dart-define=BACKEND=firebase    # Firebase (after setup below)
+flutter run --dart-define-from-file=firebase.local.json   # Firebase (after setup below)
 flutter test
 flutter analyze
 dart run flutter_launcher_icons               # after changing ../brand/ icons
@@ -19,8 +19,11 @@ dart run flutter_launcher_icons               # after changing ../brand/ icons
 ## Firebase setup (one time, needs your Google account)
 
 1. Create a Firebase project in the console. Enable **Authentication → Sign-in method → Anonymous** and create a **Firestore** database (region close to Nepal, e.g. `asia-south1`).
-2. In `app/`: `flutterfire configure` — pick the project and Android, iOS, Web. This replaces the placeholder `lib/firebase_options.dart` and adds the platform config files. `google-services.json` and `GoogleService-Info.plist` are git-ignored, so each developer runs this once. Without `firebase_options.dart`, Android/iOS still start from those two files; web needs it.
-3. From the repo root: `firebase deploy --only firestore:rules --project <your-project>`.
+2. In `app/`: `flutterfire configure` — pick the project and Android, iOS, Web. This writes `android/app/google-services.json` and `ios/Runner/GoogleService-Info.plist`, which Android and iOS read directly.
+3. Web: copy `firebase.example.json` to `firebase.local.json` and fill it from the console (Project settings → Your apps → Web app → config) or `firebase apps:sdkconfig WEB <app-id>`. It also sets `BACKEND=firebase`, so one flag runs the app on Firebase on any platform.
+4. From the repo root: `firebase deploy --only firestore:rules --project <your-project>`.
+
+**No project details in git.** `google-services.json`, `GoogleService-Info.plist`, `firebase.local.json`, `lib/firebase_options.dart` (flutterfire also writes it; the app doesn't use it) and `.firebaserc` are all git-ignored, so each developer keeps their own. These values aren't secrets; access is controlled by `firestore.rules`. Never commit service-account keys or LLM API keys.
 
 **Know this about anonymous sign-in:** the account lives on one device. Uninstalling the app or clearing its data creates a new account, and the old shop's data stays in Firestore but can no longer be opened. Fine for pilots; turn on phone login before real shops depend on it.
 

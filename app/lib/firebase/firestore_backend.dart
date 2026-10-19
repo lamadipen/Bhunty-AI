@@ -92,7 +92,9 @@ class FirestoreBackend implements ShopBackend {
     );
     _subs.add(
       _products.snapshots().listen((q) {
-        store.replaceFromRemote(products: [for (final d in q.docs) productFromMap(d.id, d.data())]);
+        // Firestore returns documents by id; keep the tap grid in the shop's own order.
+        final docs = [...q.docs]..sort(compareProductDocs);
+        store.replaceFromRemote(products: [for (final d in docs) productFromMap(d.id, d.data())]);
         done(products);
       }, onError: (Object e) => fail(products, e)),
     );
@@ -156,8 +158,12 @@ Future<(ShopStore, FirestoreBackend)> openFirestoreShop({
       'currency': 'NPR',
       'createdAt': FieldValue.serverTimestamp(),
     });
-    for (final p in demoProducts()) {
-      batch.set(backend.shop.collection('products').doc(p.id), productToMap(p));
+    final products = demoProducts();
+    for (var i = 0; i < products.length; i++) {
+      batch.set(backend.shop.collection('products').doc(products[i].id), {
+        ...productToMap(products[i]),
+        'sortOrder': i,
+      });
     }
     await batch.commit();
   }

@@ -8,13 +8,14 @@ import 'ai/demo_services.dart';
 import 'app.dart';
 import 'data/demo_data.dart';
 import 'firebase/auth_service.dart';
+import 'firebase/firebase_config.dart';
 import 'firebase/firebase_root.dart';
 import 'firebase/firestore_backend.dart';
-import 'firebase_options.dart';
 
 /// `demo` (default): in-memory demo shop, no login.
 /// `firebase`: the shop saved in Firestore —
-/// `flutter run --dart-define=BACKEND=firebase` (after `flutterfire configure`).
+/// `flutter run --dart-define-from-file=firebase.local.json` (sets BACKEND and the
+/// web settings; see app/README.md). Project details stay out of the repo.
 const _backend = String.fromEnvironment('BACKEND', defaultValue: 'demo');
 
 /// Phone OTP login is built but off for now; the app signs in anonymously.
@@ -33,13 +34,10 @@ Future<void> main() async {
   }
 
   try {
-    FirebaseOptions? options;
-    try {
-      options = DefaultFirebaseOptions.currentPlatform;
-    } on UnsupportedError {
-      // No generated options file: Android/iOS can still start from
-      // google-services.json / GoogleService-Info.plist. Web cannot.
-      if (kIsWeb) rethrow;
+    // Android/iOS: null → read google-services.json / GoogleService-Info.plist.
+    final options = kIsWeb ? webFirebaseOptionsFromDefines() : null;
+    if (kIsWeb && options == null) {
+      throw UnsupportedError('Web needs Firebase settings: run with --dart-define-from-file=firebase.local.json');
     }
     await Firebase.initializeApp(options: options);
   } catch (e) {

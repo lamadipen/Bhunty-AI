@@ -22,6 +22,8 @@ void main() {
     final shop = (await db.doc('shops/$uid').get()).data()!;
     expect(shop['ownerUid'], uid);
     expect(store.products, hasLength(8));
+    // Same order as the sample catalog, not Firestore's id order.
+    expect(store.favourites.map((p) => p.id).take(3), ['waiwai', 'egg', 'milk']);
     expect(store.product('waiwai').stockMilli, 6 * milli);
     expect(store.isSynced, isTrue);
     expect(store.today.totalPaisa, 0);

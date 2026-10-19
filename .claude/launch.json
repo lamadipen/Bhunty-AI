@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bhunte-web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765",
+        "--directory",
+        "app/build/web"
+      ],
+      "port": 8765
+    },
+    {
+      "name": "bhunte-web-firebase",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--directory",
+        "app/build/web-firebase"
+      ],
+      "port": 8766
+    }
+  ]
+}

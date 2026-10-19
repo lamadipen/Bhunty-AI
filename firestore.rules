@@ -1,0 +1,72 @@
+rules_version = '2';
+
+// Bhunte AI — Firestore security rules. Data model: docs/architecture.md.
+// Money fields are int paisa and quantities int milli-units; reject anything else.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // One owner, one shop: the shop id is the owner's uid.
+    // Helper accounts will need a members list checked here instead.
+    function isOwner(shopId) {
+      return request.auth != null && request.auth.uid == shopId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    match /shops/{shopId} {
+      allow read: if isOwner(shopId);
+      allow create: if isOwner(shopId) && incoming().ownerUid == request.auth.uid;
+      allow update: if isOwner(shopId) && incoming().ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+
+      match /products/{productId} {
+        allow read: if isOwner(shopId);
+        allow create, update: if isOwner(shopId)
+          && incoming().pricePaisa is int
+          && incoming().costPaisa is int
+          && incoming().stockMilli is int;
+        allow delete: if false;
+      }
+
+      match /customers/{customerId} {
+        allow read: if isOwner(shopId);
+        allow create, update: if isOwner(shopId) && incoming().balancePaisa is int;
+        allow delete: if false;
+
+        // Append-only: mistakes are fixed with a reversing entry, never an edit.
+        match /ledger/{entryId} {
+          allow read: if isOwner(shopId);
+          allow create: if isOwner(shopId)
+            && incoming().type in ['credit', 'payment']
+            && incoming().amountPaisa is int
+            && incoming().amountPaisa > 0;
+          allow update, delete: if false;
+        }
+      }
+
+      // Append-only. Voiding a sale will be allowed as an update of `voidedAt` only.
+      match /sales/{saleId} {
+        allow read: if isOwner(shopId);
+        allow create: if isOwner(shopId)
+          && incoming().totalPaisa is int
+          && incoming().totalPaisa >= 0
+          && incoming().createdBy == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      match /stockEntries/{entryId} {
+        allow read: if isOwner(shopId);
+        allow create: if isOwner(shopId) && incoming().totalPaisa is int;
+        allow update, delete: if false;
+      }
+
+      // Written only by Cloud Functions (the Admin SDK bypasses these rules).
+      match /dailySummaries/{day} {
+        allow read: if isOwner(shopId);
+        allow write: if false;
+      }
+    }
+  }
+}

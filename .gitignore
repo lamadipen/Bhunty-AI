@@ -1,6 +1,8 @@
 # Miscellaneous
 *.class
 *.lock
+# Apps commit their lock file
+!pubspec.lock
 *.log
 *.pyc
 *.swp
@@ -117,3 +119,17 @@ app.*.symbols
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 !/dev/ci/**/Gemfile.lock
+# Firebase emulator / rules tests
+node_modules/
+firestore-debug.log
+ui-debug.log
+firebase-debug.log
+.firebase/
+
+# Project-specific Firebase config stays local (see app/README.md)
+app/android/app/google-services.json
+app/ios/Runner/GoogleService-Info.plist
+app/lib/firebase_options.dart
+app/firebase.local.json
+app/firebase.json
+.firebaserc

@@ -10,6 +10,7 @@ import '../widgets/common.dart';
 import '../widgets/delivery_info.dart';
 import '../widgets/keypad.dart';
 import '../widgets/number_pad.dart';
+import '../widgets/product_tile.dart';
 import 'label_screen.dart';
 import 'new_product_screen.dart';
 
@@ -127,7 +128,7 @@ class _AddStockSheetState extends State<AddStockSheet> {
       children: [
         Row(
           children: [
-            LetterTile(letter: p.letter, bg: Color(p.tileBg), ink: Color(p.tileInk), size: 48),
+            ProductPicture(product: p, size: 48),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

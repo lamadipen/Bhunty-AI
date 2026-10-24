@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../core/barcode.dart';
 import '../core/money.dart';
 import '../core/qty.dart';
@@ -119,6 +121,20 @@ class Product {
         archived: archived,
         priceSetAt: priceSetAt ?? this.priceSetAt,
       );
+}
+
+/// A product's thumbnail: a small JPEG (about 256 px) kept in Firestore beside
+/// the product, so it saves offline and syncs like everything else
+/// (docs/product-photos.md, D3/D4).
+class ProductImage {
+  const ProductImage({required this.jpeg, required this.width, required this.height});
+
+  final Uint8List jpeg;
+  final int width;
+  final int height;
+
+  /// Firestore rules allow 80,000 base64 characters, i.e. 60,000 bytes.
+  static const maxBytes = 60000;
 }
 
 class Customer {

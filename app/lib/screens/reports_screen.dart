@@ -5,6 +5,7 @@ import '../core/money.dart';
 import '../core/qty.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
+import '../widgets/product_tile.dart';
 
 /// Today's numbers, all computed on the device from today's sales.
 class ReportsScreen extends StatelessWidget {
@@ -65,12 +66,7 @@ class ReportsScreen extends StatelessWidget {
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Row(
                               children: [
-                                LetterTile(
-                                  letter: item.product.letter,
-                                  bg: Color(item.product.tileBg),
-                                  ink: Color(item.product.tileInk),
-                                  size: 40,
-                                ),
+                                ProductPicture(product: item.product, size: 40),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(

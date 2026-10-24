@@ -346,7 +346,7 @@ class _CartRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          LetterTile(letter: p.letter, bg: Color(p.tileBg), ink: Color(p.tileInk), size: 40),
+          ProductPicture(product: p, size: 40),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -516,7 +516,7 @@ class VoiceConfirmSheet extends StatelessWidget {
           radius: 20,
           child: Row(
             children: [
-              LetterTile(letter: product.letter, bg: Color(product.tileBg), ink: Color(product.tileInk), size: 56),
+              ProductPicture(product: product, size: 56),
               const SizedBox(width: 14),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

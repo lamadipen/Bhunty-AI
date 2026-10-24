@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../ai/assistant_service.dart';
 import '../app.dart';
 import '../data/shop_store.dart';
+import '../photos/photo_reader.dart';
 import '../screens/login_screen.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
@@ -23,6 +24,7 @@ class FirebaseRoot extends StatefulWidget {
     required this.openShop,
     required this.assistant,
     required this.scanner,
+    this.photoReader = const NoPhotoReader(),
     this.phoneLogin = false,
   });
 
@@ -30,6 +32,7 @@ class FirebaseRoot extends StatefulWidget {
   final ShopOpener openShop;
   final AssistantService assistant;
   final BarcodeScanner scanner;
+  final PhotoReader photoReader;
 
   /// Off for now: the app signs in anonymously with no screen.
   final bool phoneLogin;
@@ -149,6 +152,7 @@ class _FirebaseRootState extends State<FirebaseRoot> {
       store: store,
       assistant: widget.assistant,
       scanner: widget.scanner,
+      photoReader: widget.photoReader,
       signOut: signOut,
     );
   }

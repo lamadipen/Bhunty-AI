@@ -5,7 +5,7 @@ Android · iOS · Web. Two modes:
 - **demo** (default): in-memory demo shop, no login. Nothing is saved.
 - **firebase**: the shop is saved in Firestore with offline persistence. Sign-in is **anonymous and automatic** for now (no login screen); phone OTP login is built but off — turn it on with `--dart-define=PHONE_LOGIN=true`.
 
-The AI backend is still the scripted demo in both modes (Phase 2).
+The AI backend is the scripted demo in both modes (Phase 2), except **adding a product from photos**: the demo uses a scripted reader, Firebase mode calls the `readProductPhotos` Cloud Function (`../functions/README.md`). Without the function deployed, photos still give the thumbnail and the barcode; the form says AI fill isn't available.
 
 ```bash
 flutter pub get
@@ -23,6 +23,7 @@ dart run flutter_launcher_icons               # after changing ../brand/ icons
 2. In `app/`: `flutterfire configure` — pick the project and Android, iOS, Web. This writes `android/app/google-services.json` and `ios/Runner/GoogleService-Info.plist`, which Android and iOS read directly.
 3. Web: copy `firebase.example.json` to `firebase.local.json` and fill it from the console (Project settings → Your apps → Web app → config) or `firebase apps:sdkconfig WEB <app-id>`. It also sets `BACKEND=firebase`, so one flag runs the app on Firebase on any platform.
 4. From the repo root: `firebase deploy --only firestore:rules --project <your-project>`.
+5. For filling the form from photos: Blaze plan, the `ANTHROPIC_API_KEY` secret and `firebase deploy --only functions` — see `../functions/README.md`.
 
 **No project details in git.** `google-services.json`, `GoogleService-Info.plist`, `firebase.local.json`, `lib/firebase_options.dart` (flutterfire also writes it; the app doesn't use it) and `.firebaserc` are all git-ignored, so each developer keeps their own. These values aren't secrets; access is controlled by `firestore.rules`. Never commit service-account keys or LLM API keys.
 
@@ -51,6 +52,8 @@ cd ../rules-test && npm install && npm test
 | 2 · Sell (बेच्नुस्) + payment sheets + done | `lib/screens/sell_screen.dart`, `lib/screens/payment_sheets.dart` |
 | 3 · Add stock (bill photo, voice, or by hand) | `lib/screens/stock_screen.dart`, `lib/screens/add_stock_sheet.dart` |
 | New product (not in the prototype) | `lib/screens/new_product_screen.dart` |
+| Add a product from photos (front, barcode, label) | `lib/screens/photo_capture_screen.dart`, `lib/photos/` |
+| Webcam capture (desktop browsers) | `lib/photos/webcam_screen.dart` |
 | Print own barcode/QR labels | `lib/screens/label_screen.dart`, `lib/labels/` |
 | Camera scanner + type-the-number | `lib/scanning/` |
 | 4 · Udharo (credit) | `lib/screens/udharo_screen.dart` |
@@ -65,6 +68,7 @@ lib/
   data/        models, ShopStore (all reads/writes), ShopBackend/ShopChange, ProposedAction, demo data
   firebase/    FirestoreBackend (batched writes + listeners), Firestore mapping, phone auth, auth gate
   ai/          AssistantService + BarcodeScanner interfaces, demo implementations, code-built answers
+  photos/      PhotoReader (Cloud Function client + demo), PhotoSource (camera/gallery, barcode from photo), shrinking
   widgets/     header, big buttons, keypad, sheets, toast
   theme/       colours and Mukta font
 assets/fonts/  Mukta (bundled so Devanagari works offline; OFL licence included)
@@ -86,7 +90,7 @@ assets/fonts/  Mukta (bundled so Devanagari works offline; OFL licence included)
 
 ## Versions
 
-If a web build can't find a plugin (`MissingPluginException` on web), run `flutter clean`: the web plugin registrant can be cached from before the plugin was added.
+If a web build can't find a plugin (`MissingPluginException` on web), run `flutter clean`: the web plugin registrant can be cached from before the plugin was added. After rebuilding, the browser may still run the old build from its service-worker cache: hard-reload (or clear site data) once.
 
 `image` is pinned below 4.11: 4.11.0 needs a newer `archive` than `pdf` 3.12 allows. `pdf` 3.13+/`printing` 5.15+ need Flutter 3.41; drop the pin when upgrading.
 

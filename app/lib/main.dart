@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import 'ai/assistant_service.dart';
 import 'ai/demo_services.dart';
 import 'app.dart';
 import 'data/demo_data.dart';
@@ -11,6 +12,7 @@ import 'firebase/auth_service.dart';
 import 'firebase/firebase_config.dart';
 import 'firebase/firebase_root.dart';
 import 'firebase/firestore_backend.dart';
+import 'scanning/scanner_screen.dart';
 
 /// `demo` (default): in-memory demo shop, no login.
 /// `firebase`: the shop saved in Firestore —
@@ -22,11 +24,15 @@ const _backend = String.fromEnvironment('BACKEND', defaultValue: 'demo');
 /// Turn on with `--dart-define=PHONE_LOGIN=true`.
 const _phoneLogin = bool.fromEnvironment('PHONE_LOGIN');
 
+/// `camera` (default) scans with the phone camera; `demo` returns the sample
+/// products' codes in turn (for demos and devices without a camera).
+const _scanner = String.fromEnvironment('SCANNER', defaultValue: 'camera');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // The AI backend (Cloud Functions) is Phase 2; the scripted demo stands in for it.
   final assistant = DemoAssistantService();
-  final scanner = DemoBarcodeScanner();
+  final BarcodeScanner scanner = _scanner == 'demo' ? DemoBarcodeScanner() : const CameraBarcodeScanner();
 
   if (_backend != 'firebase') {
     runApp(BhunteApp(store: demoStore(), assistant: assistant, scanner: scanner));

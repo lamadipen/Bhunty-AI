@@ -29,6 +29,8 @@ class _LabelScreenState extends State<LabelScreen> {
   final _labelKey = GlobalKey();
   int _copies = labelsPerSheet;
   bool _busy = false;
+  bool _showPrice = true;
+  LabelPaper _paper = LabelPaper.a4Sheet;
 
   /// The on-screen label at print resolution (~300 dpi on a 70 mm sticker).
   Future<Uint8List> _labelPng() async {
@@ -45,7 +47,7 @@ class _LabelScreenState extends State<LabelScreen> {
     try {
       final p = context.readStore.product(widget.productId);
       final png = await _labelPng();
-      final pdf = await buildLabelSheetPdf(labelPng: png, copies: _copies, title: p.nameNe);
+      final pdf = await buildLabelSheetPdf(labelPng: png, copies: _copies, paper: _paper, title: p.nameNe);
       final file = 'bhunte-label-${p.barcode}.pdf';
       if (share) {
         await Printing.sharePdf(bytes: pdf, filename: file);
@@ -70,7 +72,7 @@ class _LabelScreenState extends State<LabelScreen> {
     final store = context.store;
     final p = store.product(widget.productId);
     final kind = p.labelKind ?? LabelKind.barcode;
-    final sheets = sheetsFor(_copies);
+    final pages = pagesFor(_copies, _paper);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -81,6 +83,7 @@ class _LabelScreenState extends State<LabelScreen> {
             ),
             Expanded(
               child: ListView(
+                key: const ValueKey('label-list'),
                 padding: const EdgeInsets.all(16),
                 children: [
                   Center(
@@ -89,7 +92,10 @@ class _LabelScreenState extends State<LabelScreen> {
                         border: Border.all(color: BColors.line),
                         boxShadow: const [BoxShadow(color: Color(0x1A17201B), blurRadius: 12, offset: Offset(0, 4))],
                       ),
-                      child: RepaintBoundary(key: _labelKey, child: ProductLabel.of(p)),
+                      child: RepaintBoundary(
+                        key: _labelKey,
+                        child: ProductLabel.of(p, showPrice: _showPrice),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -118,16 +124,63 @@ class _LabelScreenState extends State<LabelScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  CardBox(
+                    radius: 16,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    child: SwitchListTile(
+                      key: const ValueKey('show-price'),
+                      contentPadding: EdgeInsets.zero,
+                      value: _showPrice,
+                      activeThumbColor: BColors.green,
+                      onChanged: (v) => setState(() => _showPrice = v),
+                      title: const Text(
+                        'मूल्य पनि छाप्ने',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: const Text(
+                        'मूल्य धेरै बदलिन्छ भने नछाप्नुस् — स्क्यान गर्दा सधैं नयाँ मूल्य आउँछ',
+                        style: TextStyle(fontSize: 13, color: BColors.inkSoft),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('कस्तो कागज?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _KindButton(
+                          label: 'A4 पाना',
+                          hint: '२४ स्टिकर (७०×३७ मिमी) वा साधारण कागज',
+                          icon: Icons.grid_on_rounded,
+                          selected: _paper == LabelPaper.a4Sheet,
+                          onTap: () => setState(() => _paper = LabelPaper.a4Sheet),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _KindButton(
+                          key: const ValueKey('paper-thermal'),
+                          label: 'थर्मल',
+                          hint: 'लेबल प्रिन्टर ५०×३० मिमी',
+                          icon: Icons.receipt_long_outlined,
+                          selected: _paper == LabelPaper.thermal50x30,
+                          onTap: () => setState(() => _paper = LabelPaper.thermal50x30),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   PadField(
                     key: const ValueKey('label-copies'),
                     label: 'कति वटा लेबल?',
-                    value: '$_copies वटा · $sheets पाना A4',
+                    value: _paper == LabelPaper.a4Sheet ? '$_copies वटा · $pages पाना A4' : '$_copies वटा लेबल',
                     onTap: _editCopies,
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'A4 मा ७०×३७ मिमीका २४ वटा स्टिकर पाना (३×८) मिल्छ। साधारण कागजमा छापेर काटेर टाँस्न पनि हुन्छ।',
+                    'प्रिन्टर छैन? "PDF पठाउनुस्" थिचेर Viber मा प्रिन्ट पसलमा पठाउनुस्।',
                     style: TextStyle(fontSize: 15, color: BColors.inkSoft, height: 1.35),
                   ),
                 ],
@@ -170,6 +223,7 @@ class _LabelScreenState extends State<LabelScreen> {
 
 class _KindButton extends StatelessWidget {
   const _KindButton({
+    super.key,
     required this.label,
     required this.hint,
     required this.icon,

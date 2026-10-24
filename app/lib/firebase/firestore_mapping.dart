@@ -25,6 +25,8 @@ Map<String, Object?> productToMap(Product p) => {
   'packName': p.packName,
   'packSizeMilli': p.packSizeMilli,
   'labelKind': p.labelKind?.name,
+  'ownCode': p.ownCode,
+  'archived': p.archived,
 };
 
 Product productFromMap(String id, Map<String, dynamic> m) => Product(
@@ -44,6 +46,9 @@ Product productFromMap(String id, Map<String, dynamic> m) => Product(
   packName: m['packName'] as String?,
   packSizeMilli: m['packSizeMilli'] as int?,
   labelKind: LabelKind.values.asNameMap()[m['labelKind']],
+  // Older docs: only own codes ever had a labelKind.
+  ownCode: m['ownCode'] as bool? ?? m['labelKind'] != null,
+  archived: m['archived'] as bool? ?? false,
 );
 
 Map<String, Object?> customerToMap(Customer c) => {

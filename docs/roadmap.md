@@ -17,7 +17,11 @@ Gate: ≥ 85 % of voice samples and bill lines parsed correctly; 5-item tap chec
 - [x] Add stock by hand: tap or scan a product, units or packs (carton/bora), cost; latest cost kept
 - [x] New product form (name typed once; price, cost, unit, pack size, opening stock, low-stock alert, barcode)
 - [x] Shop's own code for products without a barcode (in-store EAN-13, printed as barcode or QR); A4 sticker labels to print or share
-- [ ] Edit a product (price, low-stock alert, pack, favourite/grid order), product photos
+- [x] Real camera scanning (ML Kit / web) with fallbacks: type the number (check digit), camera denied/missing, non-product QR refused
+- [x] Edit a product (name, prices, unit while no stock, pack, low-stock, code: scan / own / remove), hide/unhide, reprint prompt
+- [x] Unknown code on Sell offers to add the product; hidden product's code offers to show it again
+- [x] Labels: show-price switch; A4 sheet or thermal 50×30
+- [ ] Product photos; choosing what's on the Sell grid; stock count correction; several codes per product
 - [ ] Shop setup (name) + first-20-items onboarding from a bill photo
 - [ ] Sell screen: favourites grid, barcode scan, cart, quantity keypad
 - [ ] Payment: cash with change calculator, QR (static first), udharo, split payment, discount/round-off

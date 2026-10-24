@@ -44,7 +44,14 @@ void main() {
       final s = demoStore();
       final code = s.newInStoreCode();
       expect(s.products.any((p) => p.barcode == code), isFalse);
-      final own = s.addProduct(nameNe: 'जिरा', pricePaisa: rs(40), costPaisa: rs(30), unit: Unit.packet, barcode: code);
+      final own = s.addProduct(
+        nameNe: 'जिरा',
+        pricePaisa: rs(40),
+        costPaisa: rs(30),
+        unit: Unit.packet,
+        barcode: code,
+        ownCode: true,
+      );
       expect(own.hasOwnCode, isTrue);
       expect(own.labelKind, LabelKind.barcode);
       final real = s.addProduct(
@@ -69,6 +76,13 @@ void main() {
       expect(sheetsFor(25), 2);
     });
 
+    test('thermal: one 50x30 label per page', () async {
+      expect(pagesFor(30, LabelPaper.thermal50x30), 30);
+      expect(pagesFor(30, LabelPaper.a4Sheet), 2);
+      final bytes = await buildLabelSheetPdf(labelPng: _png, copies: 3, paper: LabelPaper.thermal50x30);
+      expect(ascii.decode(bytes.sublist(0, 5)), '%PDF-');
+    });
+
     test('builds a PDF', () async {
       final bytes = await buildLabelSheetPdf(labelPng: _png, copies: 30);
       expect(ascii.decode(bytes.sublist(0, 5)), '%PDF-');
@@ -86,6 +100,7 @@ void main() {
       costPaisa: rs(30),
       unit: Unit.packet,
       barcode: store.newInStoreCode(),
+      ownCode: true,
     );
     await pumpEventQueue();
     store.setLabelKind(p.id, LabelKind.qr);
@@ -145,6 +160,15 @@ void main() {
     expect(p.hasOwnCode, isTrue);
     expect(p.labelKind, LabelKind.qr);
     expect(find.text('लेबल प्रिन्ट'), findsOneWidget);
+    final labelList = find
+        .descendant(of: find.byKey(const ValueKey('label-list')), matching: find.byType(Scrollable))
+        .first;
+    // Price off: the label preview drops it.
+    expect(find.text('रु 40'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('show-price')));
+    await tester.pumpAndSettle();
+    expect(find.text('रु 40'), findsNothing);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('label-copies')), 150, scrollable: labelList);
     expect(find.text('24 वटा · 1 पाना A4'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('label-copies')));
@@ -156,8 +180,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('key-${Keys.ok}')).last);
     await tester.pumpAndSettle();
     expect(find.text('30 वटा · 2 पाना A4'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('paper-thermal')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('paper-thermal')));
+    await tester.pumpAndSettle();
+    expect(find.text('30 वटा लेबल'), findsOneWidget);
 
     // Switching to barcode here is remembered for reprints.
+    await tester.ensureVisible(find.text('बारकोड').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('बारकोड').last);
     await tester.pumpAndSettle();
     expect(store.product(p.id).labelKind, LabelKind.barcode);

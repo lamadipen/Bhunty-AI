@@ -3,17 +3,46 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-/// Common A4 sticker sheet: 3 columns × 8 rows of 70 × 37 mm, no page margin.
+/// What the labels are printed on.
+enum LabelPaper {
+  /// Common A4 sticker sheet: 3 columns × 8 rows of 70 × 37 mm, no page margin.
+  a4Sheet,
+
+  /// One 50 × 30 mm label per page, for thermal label printers.
+  thermal50x30,
+}
+
 const labelsPerSheet = 24;
 const _cols = 3, _rows = 8;
 const _labelW = 70 * PdfPageFormat.mm, _labelH = 37 * PdfPageFormat.mm;
 
 int sheetsFor(int copies) => copies <= 0 ? 0 : (copies + labelsPerSheet - 1) ~/ labelsPerSheet;
 
+/// Pages the PDF will have.
+int pagesFor(int copies, LabelPaper paper) =>
+    paper == LabelPaper.a4Sheet ? sheetsFor(copies) : (copies <= 0 ? 0 : copies);
+
 /// A PDF of [copies] identical labels, from a PNG of one label.
-Future<Uint8List> buildLabelSheetPdf({required Uint8List labelPng, required int copies, String title = 'labels'}) {
+Future<Uint8List> buildLabelSheetPdf({
+  required Uint8List labelPng,
+  required int copies,
+  LabelPaper paper = LabelPaper.a4Sheet,
+  String title = 'labels',
+}) {
   final doc = pw.Document(title: title, creator: 'Bhunte AI');
   final image = pw.MemoryImage(labelPng);
+  if (paper == LabelPaper.thermal50x30) {
+    const format = PdfPageFormat(50 * PdfPageFormat.mm, 30 * PdfPageFormat.mm, marginAll: 1 * PdfPageFormat.mm);
+    for (var i = 0; i < copies; i++) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: format,
+          build: (_) => pw.Center(child: pw.Image(image, fit: pw.BoxFit.contain)),
+        ),
+      );
+    }
+    return doc.save();
+  }
   var left = copies;
   for (var sheet = 0; sheet < sheetsFor(copies); sheet++) {
     final onSheet = left < labelsPerSheet ? left : labelsPerSheet;

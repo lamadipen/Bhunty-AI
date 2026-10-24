@@ -51,6 +51,10 @@ class FirestoreBackend implements ShopBackend {
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
+    for (final p in c.updatedProducts) {
+      final fields = productToMap(p)..remove('stockMilli');
+      batch.set(_products.doc(p.id), {...fields, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+    }
     final sale = c.sale;
     if (sale != null) {
       batch.set(_sales.doc(sale.id), {...saleToMap(sale, createdBy: uid), 'syncedAt': FieldValue.serverTimestamp()});

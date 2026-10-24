@@ -15,9 +15,10 @@ class ProductLabel extends StatelessWidget {
     required this.priceText,
     required this.code,
     required this.kind,
+    this.showPrice = true,
   });
 
-  ProductLabel.of(Product p, {super.key, LabelKind? kind})
+  ProductLabel.of(Product p, {super.key, LabelKind? kind, this.showPrice = true})
     : nameNe = p.nameNe,
       priceText = priceLabel(p),
       code = p.barcode!,
@@ -27,6 +28,9 @@ class ProductLabel extends StatelessWidget {
   final String priceText;
   final String code;
   final LabelKind kind;
+
+  /// Off for shops that change prices often: printed prices go stale, scans don't.
+  final bool showPrice;
 
   /// Logical size; 70:37 like the sticker.
   static const width = 280.0;
@@ -67,8 +71,7 @@ class ProductLabel extends StatelessWidget {
             Row(
               children: [
                 Expanded(child: name),
-                const SizedBox(width: 8),
-                price,
+                if (showPrice) ...[const SizedBox(width: 8), price],
               ],
             ),
             const SizedBox(height: 4),
@@ -92,8 +95,7 @@ class ProductLabel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   name,
-                  const SizedBox(height: 4),
-                  price,
+                  if (showPrice) ...[const SizedBox(height: 4), price],
                   const SizedBox(height: 8),
                   FittedBox(
                     fit: BoxFit.scaleDown,

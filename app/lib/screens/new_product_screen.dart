@@ -11,17 +11,23 @@ import '../labels/product_label.dart';
 import '../widgets/number_pad.dart';
 import 'label_screen.dart';
 
-/// Adds a product to the catalog. The name is typed once — the only text
-/// keyboard in the app — until voice/photo naming arrives (Phase 2).
-/// Numbers use the keypad. Returns the new [Product], or null.
+/// Adds a product to the catalog, or edits one ([editing]). The name is
+/// typed once — the only text keyboard in the app — until voice/photo naming
+/// arrives (Phase 2). Numbers use the keypad. Returns the saved [Product], or null.
 class NewProductScreen extends StatefulWidget {
-  const NewProductScreen({super.key, this.barcode});
+  const NewProductScreen({super.key, this.barcode, this.editing});
 
   /// Pre-filled when the user scanned a code that isn't in the catalog yet.
   final String? barcode;
 
+  /// The product being edited; null when adding a new one.
+  final Product? editing;
+
   static Future<Product?> open(BuildContext context, {String? barcode}) =>
       Navigator.of(context).push<Product>(MaterialPageRoute(builder: (_) => NewProductScreen(barcode: barcode)));
+
+  static Future<Product?> edit(BuildContext context, Product product) =>
+      Navigator.of(context).push<Product>(MaterialPageRoute(builder: (_) => NewProductScreen(editing: product)));
 
   @override
   State<NewProductScreen> createState() => _NewProductScreenState();
@@ -43,8 +49,30 @@ class _NewProductScreenState extends State<NewProductScreen> {
   LabelKind _labelKind = LabelKind.barcode;
 
   /// The code was generated here (no barcode on the packet).
-  bool get _ownCode => _barcode != null && isInStoreCode(_barcode!);
+  late bool _isOwn = widget.editing?.ownCode ?? false;
+
+  bool get _isEdit => widget.editing != null;
+  bool get _ownCode => _barcode != null && _isOwn;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.editing;
+    if (p != null) {
+      String money(int paisa) => paisa == 0 ? '' : formatAmount(paisa).replaceAll(',', '');
+      _nameNe.text = p.nameNe;
+      _nameEn.text = p.nameEn;
+      _unit = p.unit;
+      _price = money(p.pricePaisa);
+      _cost = money(p.costPaisa);
+      _lowAt = p.lowStockAtMilli == 0 ? '' : formatQty(p.lowStockAtMilli);
+      _packName = p.packName;
+      _packSize = p.packSizeMilli == null ? '' : formatQty(p.packSizeMilli!);
+      _barcode = p.barcode;
+      _labelKind = p.labelKind ?? LabelKind.barcode;
+    }
+  }
 
   @override
   void dispose() {
@@ -78,17 +106,87 @@ class _NewProductScreenState extends State<NewProductScreen> {
 
   Future<void> _scan() async {
     _closeKeyboard();
-    final code = await context.scanner.scan();
-    if (code != null && mounted) setState(() => _barcode = code);
+    final code = await context.scanner.scan(context);
+    if (code != null && mounted) {
+      setState(() {
+        _barcode = code;
+        _isOwn = false;
+      });
+    }
   }
 
   void _generate() {
     _closeKeyboard();
-    setState(() => _barcode = context.readStore.newInStoreCode());
+    setState(() {
+      _barcode = context.readStore.newInStoreCode();
+      _isOwn = true;
+    });
+  }
+
+  /// Removing a code that is already on printed labels makes those labels useless: ask first.
+  Future<void> _removeCode() async {
+    final old = widget.editing;
+    final printed = old != null && old.hasOwnCode && old.barcode == _barcode;
+    if (printed) {
+      final ok = await _confirm(
+        title: 'यो कोड हटाउने?',
+        body: 'यो कोडका छापिएका लेबल अब स्क्यान हुँदैनन्।',
+        yes: 'हटाउनुस्',
+      );
+      if (ok != true) return;
+    }
+    setState(() {
+      _barcode = null;
+      _isOwn = false;
+    });
+  }
+
+  Future<bool?> _confirm({required String title, required String body, required String yes, String no = 'रद्द'}) =>
+      showBhunteSheet<bool>(
+        context,
+        (c) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            Text(body, style: const TextStyle(fontSize: 16, color: BColors.inkSoft, height: 1.35)),
+            const SizedBox(height: 16),
+            BigButton(label: yes, key: const ValueKey('confirm-yes'), onPressed: () => Navigator.pop(c, true)),
+            const SizedBox(height: 8),
+            BigButton(
+              label: no,
+              outlineColor: BColors.line,
+              foreground: BColors.ink,
+              height: 56,
+              fontSize: 18,
+              onPressed: () => Navigator.pop(c, false),
+            ),
+          ],
+        ),
+      );
+
+  Future<void> _toggleHidden() async {
+    final store = context.readStore;
+    final p = store.product(widget.editing!.id);
+    if (!p.archived) {
+      final ok = await _confirm(
+        title: '${p.nameNe} लुकाउने?',
+        body: 'बिक्री, स्टक र हिसाब केही मेटिँदैन। पछि स्टक पेजको "लुकाइएका सामान" बाट फेरि देखाउन सकिन्छ।',
+        yes: 'लुकाउनुस्',
+      );
+      if (ok != true || !mounted) return;
+    }
+    store.setArchived(p.id, !p.archived);
+    showToast(context, p.archived ? '${p.nameNe} फेरि देखियो' : '${p.nameNe} लुकाइयो');
+    Navigator.pop(context, store.product(p.id));
   }
 
   void _save() {
     _closeKeyboard();
+    if (_isEdit) {
+      _saveEdit();
+      return;
+    }
     final store = context.readStore;
     final price = parseMoneyPaisa(_price);
     final cost = parseMoneyPaisa(_cost);
@@ -114,6 +212,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
       openingStockMilli: parseQtyMilli(_opening),
       lowStockAtMilli: _lowAt.isEmpty ? null : parseQtyMilli(_lowAt),
       barcode: _barcode,
+      ownCode: _ownCode,
       packName: _packName,
       packSizeMilli: packSize,
       labelKind: _labelKind,
@@ -127,15 +226,75 @@ class _NewProductScreenState extends State<NewProductScreen> {
     }
   }
 
+  Future<void> _saveEdit() async {
+    final store = context.readStore;
+    final old = widget.editing!;
+    final price = parseMoneyPaisa(_price);
+    final cost = parseMoneyPaisa(_cost);
+    final packSize = _packName == null ? null : parseQtyMilli(_packSize);
+    Product saved;
+    try {
+      saved = store.updateProduct(
+        old.id,
+        nameNe: _nameNe.text,
+        nameEn: _nameEn.text,
+        pricePaisa: price,
+        costPaisa: cost,
+        unit: _unit,
+        lowStockAtMilli: _lowAt.isEmpty ? null : parseQtyMilli(_lowAt),
+        barcode: _barcode,
+        ownCode: _ownCode,
+        packName: _packName,
+        packSizeMilli: packSize,
+        labelKind: _labelKind,
+      );
+    } on ArgumentError catch (e) {
+      setState(() => _error = '${e.message}');
+      return;
+    }
+    showToast(context, '${saved.nameNe} सुरक्षित भयो');
+    if (!saved.hasOwnCode) {
+      Navigator.pop(context, saved);
+      return;
+    }
+    final newCode = !old.hasOwnCode || old.barcode != saved.barcode;
+    final labelChanged = old.pricePaisa != saved.pricePaisa || old.nameNe != saved.nameNe || old.unit != saved.unit;
+    var print = newCode;
+    if (!newCode && labelChanged) {
+      // Printed labels show the name and price: offer fresh ones.
+      print =
+          await _confirm(
+            title: 'नयाँ लेबल छाप्ने?',
+            body:
+                'पुराना लेबलमा ${old.nameNe} · ${formatRs(old.pricePaisa)} लेखिएको छ। स्क्यान गर्दा नयाँ मूल्य नै आउँछ, तर लेबलको अक्षर पुरानो रहन्छ।',
+            yes: 'नयाँ लेबल छाप्नुस्',
+            no: 'पछि',
+          ) ==
+          true;
+    }
+    if (!mounted) return;
+    if (print) {
+      Navigator.pushReplacement(context, LabelScreen.route<Product>(saved.id), result: saved);
+    } else {
+      Navigator.pop(context, saved);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final store = context.store;
+    final editing = _isEdit ? store.product(widget.editing!.id) : null;
+    final unitLocked = editing != null && !store.canChangeUnit(editing);
     final price = parseMoneyPaisa(_price), cost = parseMoneyPaisa(_cost);
     final margin = price - cost;
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            const ScreenHeader(title: 'नयाँ सामान', subtitle: 'एक पटक भर्नुस्, सधैं काम लाग्छ'),
+            ScreenHeader(
+              title: _isEdit ? 'सामान मिलाउनुस्' : 'नयाँ सामान',
+              subtitle: _isEdit ? widget.editing!.nameNe : 'एक पटक भर्नुस्, सधैं काम लाग्छ',
+            ),
             Expanded(
               child: ListView(
                 key: const ValueKey('new-product-list'),
@@ -148,11 +307,19 @@ class _NewProductScreenState extends State<NewProductScreen> {
                   const SizedBox(height: 16),
                   _label('कसरी बेच्नुहुन्छ?'),
                   _choices<Unit>(
-                    values: Unit.values,
+                    values: unitLocked ? [_unit] : Unit.values,
                     selected: _unit,
                     label: (u) => u.ne,
                     onPick: (u) => setState(() => _unit = u),
                   ),
+                  if (unitLocked)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'स्टक भएकोले एकाइ बदल्न मिल्दैन',
+                        style: TextStyle(fontSize: 14, color: BColors.inkSoft),
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -203,17 +370,24 @@ class _NewProductScreenState extends State<NewProductScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: PadField(
-                          key: const ValueKey('field-opening'),
-                          label: 'अहिले कति छ?',
-                          value: '${_opening.isEmpty ? '0' : _opening} ${_unit.ne}',
-                          onTap: () => _pad(
-                            title: 'अहिले कति छ?',
-                            current: _opening,
-                            decimal: _unit.isLoose,
-                            set: (v) => _opening = v,
-                          ),
-                        ),
+                        child: editing != null
+                            // Stock changes only through sales and stock entries, never by editing.
+                            ? PadField(
+                                label: 'अहिलेको स्टक',
+                                value: '${formatQty(editing.stockMilli)} ${_unit.ne}',
+                                onTap: () => showToast(context, 'स्टक "स्टक थप्नुस्" बाट थपिन्छ'),
+                              )
+                            : PadField(
+                                key: const ValueKey('field-opening'),
+                                label: 'अहिले कति छ?',
+                                value: '${_opening.isEmpty ? '0' : _opening} ${_unit.ne}',
+                                onTap: () => _pad(
+                                  title: 'अहिले कति छ?',
+                                  current: _opening,
+                                  decimal: _unit.isLoose,
+                                  set: (v) => _opening = v,
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -309,7 +483,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
                                 icon: Icons.close_rounded,
                                 label: 'कोड हटाउनुस्',
                                 size: 44,
-                                onPressed: () => setState(() => _barcode = null),
+                                onPressed: _removeCode,
                               ),
                             ],
                           ),
@@ -361,11 +535,29 @@ class _NewProductScreenState extends State<NewProductScreen> {
                             icon: Icons.close_rounded,
                             label: 'बारकोड हटाउनुस्',
                             size: 44,
-                            onPressed: () => setState(() => _barcode = null),
+                            onPressed: _removeCode,
                           ),
                         ],
                       ),
                     ),
+                  if (editing != null) ...[
+                    const SizedBox(height: 28),
+                    BigButton(
+                      key: const ValueKey('toggle-hidden'),
+                      label: editing.archived ? 'फेरि देखाउनुस्' : 'यो सामान लुकाउनुस्',
+                      icon: editing.archived ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      outlineColor: editing.archived ? BColors.green : BColors.warnBorder,
+                      foreground: editing.archived ? BColors.green : BColors.warnInk,
+                      height: 56,
+                      fontSize: 17,
+                      onPressed: _toggleHidden,
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'बेच्न छोडेको वा गल्तीले थपेको सामान लुकाउनुस्। केही मेटिँदैन।',
+                      style: TextStyle(fontSize: 14, color: BColors.inkSoft),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -389,7 +581,12 @@ class _NewProductScreenState extends State<NewProductScreen> {
                         ),
                       ),
                     ),
-                  BigButton(label: 'सामान थप्नुस्', trailingIcon: Icons.check_rounded, height: 66, onPressed: _save),
+                  BigButton(
+                    label: _isEdit ? 'सुरक्षित गर्नुस्' : 'सामान थप्नुस्',
+                    trailingIcon: Icons.check_rounded,
+                    height: 66,
+                    onPressed: _save,
+                  ),
                 ],
               ),
             ),

@@ -72,11 +72,17 @@ class ShopStore extends ChangeNotifier {
 
   // ---- Reads ----
 
-  List<Product> get products => List.unmodifiable(_products.values);
-  List<Product> get favourites => _products.values.where((p) => p.isFavourite).toList();
-  List<Product> get lowStock => _products.values.where((p) => p.isLow).toList();
+  Iterable<Product> get _visible => _products.values.where((p) => !p.archived);
+
+  /// The catalog the shop works with; hidden products are left out.
+  List<Product> get products => List.unmodifiable(_visible);
+  List<Product> get favourites => _visible.where((p) => p.isFavourite).toList();
+  List<Product> get lowStock => _visible.where((p) => p.isLow).toList();
+  List<Product> get archivedProducts => _products.values.where((p) => p.archived).toList();
 
   Product product(String id) => _products[id] ?? (throw ArgumentError('No product $id'));
+
+  /// Any product with this code, hidden ones too (callers decide what to do).
   Product? productByBarcode(String code) {
     for (final p in _products.values) {
       if (p.barcode == code) return p;
@@ -303,14 +309,41 @@ class ShopStore extends ChangeNotifier {
     String? barcode,
     String? packName,
     int? packSizeMilli,
+  }) => validateProduct(
+    nameNe: nameNe,
+    pricePaisa: pricePaisa,
+    costPaisa: costPaisa,
+    barcode: barcode,
+    packName: packName,
+    packSizeMilli: packSizeMilli,
+  );
+
+  /// Checks a new or edited product ([excludeId] = the product being edited).
+  String? validateProduct({
+    String? excludeId,
+    required String nameNe,
+    required int pricePaisa,
+    required int costPaisa,
+    String? barcode,
+    String? packName,
+    int? packSizeMilli,
   }) {
     final name = nameNe.trim();
     if (name.isEmpty) return 'सामानको नाम लेख्नुस्';
-    if (_products.values.any((p) => p.nameNe.trim() == name)) return 'यो नामको सामान पहिल्यै छ';
+    for (final p in _products.values) {
+      if (p.id != excludeId && p.nameNe.trim() == name) {
+        return p.archived
+            ? 'यो नामको सामान लुकाइएको छ — "लुकाइएका सामान" बाट फेरि देखाउनुस्'
+            : 'यो नामको सामान पहिल्यै छ';
+      }
+    }
     if (pricePaisa <= 0) return 'बेच्ने मूल्य लेख्नुस्';
     if (costPaisa < 0) return 'किनेको मूल्य मिलेन';
-    if (barcode != null && barcode.isNotEmpty && productByBarcode(barcode) != null) {
-      return 'यो बारकोड अर्को सामानमा छ';
+    if (barcode != null && barcode.isNotEmpty) {
+      final other = productByBarcode(barcode);
+      if (other != null && other.id != excludeId) {
+        return other.archived ? 'यो कोड लुकाइएको "${other.nameNe}" मा छ' : 'यो बारकोड "${other.nameNe}" मा छ';
+      }
     }
     if (packName != null && (packSizeMilli ?? 0) <= milli) return 'एक $packNameमा कति छ, लेख्नुस्';
     return null;
@@ -327,6 +360,7 @@ class ShopStore extends ChangeNotifier {
     int openingStockMilli = 0,
     int? lowStockAtMilli,
     String? barcode,
+    bool ownCode = false,
     String? packName,
     int? packSizeMilli,
     LabelKind? labelKind,
@@ -342,6 +376,8 @@ class ShopStore extends ChangeNotifier {
     if (problem != null) throw ArgumentError(problem);
     final name = nameNe.trim();
     final look = _tilePalette[_products.length % _tilePalette.length];
+    final code = (barcode == null || barcode.isEmpty) ? null : barcode;
+    final own = ownCode && code != null;
     final p = Product(
       id: _newId('prod'),
       nameNe: name,
@@ -354,10 +390,11 @@ class ShopStore extends ChangeNotifier {
       letter: String.fromCharCodes(name.runes.take(2)),
       tileBg: look.$1,
       tileInk: look.$2,
-      barcode: (barcode == null || barcode.isEmpty) ? null : barcode,
+      barcode: code,
+      ownCode: own,
       packName: packName,
       packSizeMilli: packName == null ? null : packSizeMilli,
-      labelKind: (barcode != null && isInStoreCode(barcode)) ? (labelKind ?? LabelKind.barcode) : null,
+      labelKind: own ? (labelKind ?? LabelKind.barcode) : null,
     );
     _products[p.id] = p;
     if (openingStockMilli > 0) {
@@ -372,6 +409,94 @@ class ShopStore extends ChangeNotifier {
       _commit(ShopChange(newProducts: [p]));
     }
     return _products[p.id]!;
+  }
+
+  /// Saves edits to a product's details. Stock is never edited here: it only
+  /// changes through sales and stock entries.
+  Product updateProduct(
+    String id, {
+    required String nameNe,
+    String nameEn = '',
+    required int pricePaisa,
+    required int costPaisa,
+    required Unit unit,
+    int? lowStockAtMilli,
+    String? barcode,
+    bool ownCode = false,
+    String? packName,
+    int? packSizeMilli,
+    LabelKind? labelKind,
+  }) {
+    final old = product(id);
+    final problem =
+        validateProduct(
+          excludeId: id,
+          nameNe: nameNe,
+          pricePaisa: pricePaisa,
+          costPaisa: costPaisa,
+          barcode: barcode,
+          packName: packName,
+          packSizeMilli: packSizeMilli,
+        ) ??
+        (unit != old.unit && !canChangeUnit(old) ? 'स्टक भएपछि एकाइ बदल्न मिल्दैन' : null);
+    if (problem != null) throw ArgumentError(problem);
+    final name = nameNe.trim();
+    final code = (barcode == null || barcode.isEmpty) ? null : barcode;
+    final own = ownCode && code != null;
+    final p = Product(
+      id: id,
+      nameNe: name,
+      nameEn: nameEn.trim(),
+      pricePaisa: pricePaisa,
+      costPaisa: costPaisa,
+      unit: unit,
+      stockMilli: old.stockMilli,
+      lowStockAtMilli: lowStockAtMilli ?? 0,
+      letter: name == old.nameNe ? old.letter : String.fromCharCodes(name.runes.take(2)),
+      tileBg: old.tileBg,
+      tileInk: old.tileInk,
+      barcode: code,
+      ownCode: own,
+      isFavourite: old.isFavourite,
+      packName: packName,
+      packSizeMilli: packName == null ? null : packSizeMilli,
+      labelKind: own ? (labelKind ?? old.labelKind ?? LabelKind.barcode) : null,
+      archived: old.archived,
+    );
+    _products[id] = p;
+    _commit(ShopChange(updatedProducts: [p]));
+    return p;
+  }
+
+  /// The unit can change only while there is no stock (it would change what the count means).
+  bool canChangeUnit(Product p) => p.stockMilli == 0;
+
+  /// Hides a product from grids and scanning, or shows it again. Nothing is deleted.
+  void setArchived(String id, bool archived) {
+    final old = product(id);
+    if (old.archived == archived) return;
+    final p = Product(
+      id: old.id,
+      nameNe: old.nameNe,
+      nameEn: old.nameEn,
+      pricePaisa: old.pricePaisa,
+      costPaisa: old.costPaisa,
+      unit: old.unit,
+      stockMilli: old.stockMilli,
+      lowStockAtMilli: old.lowStockAtMilli,
+      letter: old.letter,
+      tileBg: old.tileBg,
+      tileInk: old.tileInk,
+      barcode: old.barcode,
+      ownCode: old.ownCode,
+      isFavourite: old.isFavourite,
+      packName: old.packName,
+      packSizeMilli: old.packSizeMilli,
+      labelKind: old.labelKind,
+      archived: archived,
+    );
+    _products[id] = p;
+    _commit(ShopChange(updatedProducts: [p]));
   }
 
   Customer addCustomer(String name) {

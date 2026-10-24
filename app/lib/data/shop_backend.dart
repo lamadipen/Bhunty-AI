@@ -41,6 +41,7 @@ class ShopChange {
     this.newProducts = const [],
     this.costUpdates = const {},
     this.labelKinds = const {},
+    this.updatedProducts = const [],
     this.stockEntry,
   });
 
@@ -64,6 +65,10 @@ class ShopChange {
 
   /// productId → how its own label is printed.
   final Map<String, LabelKind> labelKinds;
+
+  /// Edited details (name, price, code, hidden…). Their stock must not be
+  /// written from here: other devices may have changed it.
+  final List<Product> updatedProducts;
   final StockEntry? stockEntry;
 }
 

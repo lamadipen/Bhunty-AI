@@ -3,7 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>सामानको बारकोड वा QR स्क्यान गर्न क्यामेरा चाहिन्छ। (Camera is used to scan product barcodes.)</string>
+	<string>सामानको बारकोड स्क्यान गर्न र फोटो खिच्न क्यामेरा चाहिन्छ। (Camera is used to scan barcodes and photograph products.)</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ग्यालरीबाट सामानको फोटो छान्न। (Pick product photos from your gallery.)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

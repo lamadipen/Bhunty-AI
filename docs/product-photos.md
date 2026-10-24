@@ -1,6 +1,6 @@
 # Add a product from photos — spec and test scenarios
 
-Status: **draft for review** (2026-10-24). Nothing here is implemented yet.
+Status: **implemented** (2026-10-24) — `functions/`, `app/lib/photos/`, `app/lib/screens/photo_capture_screen.dart`.
 Builds on [product-addition.md](product-addition.md): every rule there still applies (codes, validation, batches, price changes). This spec only adds a faster way to **fill the new-product form**.
 
 ---
@@ -10,7 +10,7 @@ Builds on [product-addition.md](product-addition.md): every rule there still app
 | # | Decision |
 |---|---|
 | D1 | Three labelled photo slots per product: **front** (thumbnail), **barcode** (optional), **label** (text: name, size, MRP). One photo per slot, replaceable. |
-| D2 | Photos come from the **camera** or the **gallery / local files** (file picker on web). |
+| D2 | Photos come from the **camera** or the **gallery / local files** (file picker on web). Desktop browsers ignore the camera hint on a file input, so there the camera button opens a **live webcam screen** (preview → खिच्नुस् → फेरि खिच्नुस् / ठीक छ); no camera or permission refused → message with **फाइल छान्नुस्** and retry. |
 | D3 | The **front** photo is kept as the product's **thumbnail** (≈256 px). The barcode and label photos are used once to fill the form, then discarded. |
 | D4 | Thumbnails live in **Firestore** (`productImages/{productId}`), so they save offline and sync like everything else. |
 | D5 | The AI reads the **front + label** photos (and the barcode photo only if the phone couldn't read it). |
@@ -84,7 +84,7 @@ out: { nameNe?, nameEn?, brand?, sizeText?,          # e.g. "70 g", "1 L", "12 p
 errors: unauthenticated | invalid-argument (too many / too big) | limit-reached | unreadable | unavailable
 ```
 
-The model is called with a fixed tool/JSON schema, temperature 0, and told: read only what is printed; leave a field out rather than guess; never output prices other than MRP.
+The model (Claude Haiku, region asia-south1) is called with structured outputs (a fixed JSON schema) at low effort, and told: read only what is printed; leave a field out rather than guess; never output prices other than MRP.
 
 **Security rules (planned):** `productImages` — owner read/write/delete, `jpegBase64` is a string ≤ 80,000 chars; `aiUsage` — owner read-only (function writes with admin rights).
 
@@ -144,6 +144,10 @@ Format: Given → When → Then. "AI returns" means the (faked in tests) Cloud F
 
 **F-12 Remove / replace thumbnail**
 - Replace → doc overwritten, `imageUpdatedAt` changes. Remove → doc deleted, `hasImage` false, letter tile returns.
+
+**F-13b Webcam on a desktop browser**
+- When: on a laptop browser, tap क्यामेरा on a slot.
+- Then: the live webcam screen opens (not the file picker); take → review → ठीक छ fills the slot. No camera / permission refused → "क्यामेरा भेटिएन" / "अनुमति छैन…" with फाइल छान्नुस् (opens the file picker) and फेरि प्रयास.
 
 **F-13 From files on the web**
 - When: on web, pick three files from disk.

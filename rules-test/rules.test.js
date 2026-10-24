@@ -129,3 +129,39 @@ describe('append-only records', () => {
     await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/dailySummaries/2026-10-18`), { totalPaisa: 1 }));
   });
 });
+
+describe('product photos (docs/product-photos.md)', () => {
+  const jpeg = 'A'.repeat(40000);
+
+  it('the app saves a thumbnail with its product flag in one batch, and can remove it', async () => {
+    const db = ownerDb();
+    const b = writeBatch(db);
+    b.set(doc(db, `shops/${OWNER}/productImages/egg`), { jpegBase64: jpeg, width: 256, height: 192, updatedAt: serverTimestamp(), updatedBy: OWNER });
+    b.update(doc(db, `shops/${OWNER}/products/egg`), { hasImage: true, imageUpdatedAt: serverTimestamp() });
+    await assertSucceeds(b.commit());
+    await assertSucceeds(getDoc(doc(db, `shops/${OWNER}/productImages/egg`)));
+    const r = writeBatch(db);
+    r.delete(doc(db, `shops/${OWNER}/productImages/egg`));
+    r.update(doc(db, `shops/${OWNER}/products/egg`), { hasImage: false });
+    await assertSucceeds(r.commit());
+  });
+
+  it('thumbnails over 80,000 characters, of other shops, or without updatedBy are refused', async () => {
+    const ok = { jpegBase64: jpeg, width: 256, height: 256, updatedBy: OWNER };
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/productImages/egg`), { ...ok, jpegBase64: 'A'.repeat(80001) }));
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/productImages/egg`), { ...ok, jpegBase64: '' }));
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/productImages/egg`), { ...ok, updatedBy: OTHER }));
+    await assertFails(setDoc(doc(otherDb(), `shops/${OWNER}/productImages/egg`), { ...ok, updatedBy: OTHER }));
+    await assertFails(getDoc(doc(otherDb(), `shops/${OWNER}/productImages/egg`)));
+  });
+
+  it('AI usage is readable by the owner but only the Cloud Function writes it', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `shops/${OWNER}/aiUsage/2026-10-24`), { photoReads: 3 });
+    });
+    await assertSucceeds(getDoc(doc(ownerDb(), `shops/${OWNER}/aiUsage/2026-10-24`)));
+    await assertFails(getDoc(doc(otherDb(), `shops/${OWNER}/aiUsage/2026-10-24`)));
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/aiUsage/2026-10-24`), { photoReads: 0 }));
+    await assertFails(deleteDoc(doc(ownerDb(), `shops/${OWNER}/aiUsage/2026-10-24`)));
+  });
+});

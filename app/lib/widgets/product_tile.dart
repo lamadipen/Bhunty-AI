@@ -11,7 +11,35 @@ String priceLabel(Product p) => p.unit.isLoose ? '${formatRs(p.pricePaisa)}/${p.
 
 String stockLabel(Product p) => 'बाँकी ${formatQty(p.stockMilli)} ${p.unit.ne}';
 
-/// Picture-grid tile: letters on a tint, name, and a caption (price by default).
+/// The product's photo when it has one, else its letters on a tint (PR11).
+class ProductPicture extends StatelessWidget {
+  const ProductPicture({super.key, required this.product, this.size = 44});
+
+  final Product product;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = product;
+    final image = context.store.image(p.id);
+    if (image == null) return LetterTile(letter: p.letter, bg: Color(p.tileBg), ink: Color(p.tileInk), size: size);
+    return ClipRRect(
+      key: ValueKey('thumb-${p.id}'),
+      borderRadius: BorderRadius.circular(size * 0.3),
+      child: Image.memory(
+        image.jpeg,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+        errorBuilder: (_, _, _) => LetterTile(letter: p.letter, bg: Color(p.tileBg), ink: Color(p.tileInk), size: size),
+      ),
+    );
+  }
+}
+
+/// Picture-grid tile: photo or letters, name, and a caption (price by default).
 class ProductTile extends StatelessWidget {
   const ProductTile({
     super.key,
@@ -57,7 +85,7 @@ class ProductTile extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  LetterTile(letter: p.letter, bg: Color(p.tileBg), ink: Color(p.tileInk)),
+                  ProductPicture(product: p),
                   const SizedBox(height: 2),
                   FittedBox(
                     fit: BoxFit.scaleDown,

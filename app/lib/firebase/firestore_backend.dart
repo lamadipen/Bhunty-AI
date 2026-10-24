@@ -71,6 +71,19 @@ class FirestoreBackend implements ShopBackend {
         ..['pricePaisa'] = pc.newPricePaisa
         ..['priceSetAt'] = Timestamp.fromDate(pc.createdAt);
     }
+    c.images.forEach((id, image) {
+      final doc = shop.collection('productImages').doc(id);
+      final fields = productFields.putIfAbsent(id, () => {});
+      if (image == null) {
+        batch.delete(doc);
+        fields['hasImage'] = false;
+        fields['imageUpdatedAt'] = FieldValue.delete();
+      } else {
+        batch.set(doc, productImageToMap(image, updatedBy: uid));
+        fields['hasImage'] = true;
+        fields['imageUpdatedAt'] = FieldValue.serverTimestamp();
+      }
+    });
     productFields.forEach((id, fields) => batch.update(_products.doc(id), fields));
     for (final nc in c.newCustomers) {
       batch.set(_customers.doc(nc.id), {...customerToMap(nc), 'createdAt': FieldValue.serverTimestamp()});
@@ -126,6 +139,12 @@ class FirestoreBackend implements ShopBackend {
         store.replaceFromRemote(products: [for (final d in docs) productFromMap(d.id, d.data())]);
         done(products);
       }, onError: (Object e) => fail(products, e)),
+    );
+    // Thumbnails don't hold up opening the shop: tiles show letters until they arrive.
+    _subs.add(
+      shop.collection('productImages').snapshots().listen((q) {
+        store.replaceFromRemote(images: {for (final d in q.docs) d.id: ?productImageFromMap(d.data())});
+      }, onError: (Object e) => debugPrint('Bhunte: thumbnails: $e')),
     );
     _subs.add(
       _customers.snapshots().listen((q) {

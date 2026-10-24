@@ -23,7 +23,8 @@ Gate: ≥ 85 % of voice samples and bill lines parsed correctly; 5-item tap chec
 - [x] Labels: show-price switch; A4 sheet or thermal 50×30
 - [x] Stock in batches (own cost + sale price each), price history, latest price wins; optional supplier/bill no. — `docs/product-addition.md`
 - [ ] Manual bill (several products in one save), batch corrections, supplier records
-- [ ] Product photos; choosing what's on the Sell grid; stock count correction; several codes per product
+- [x] Product photos (thumbnails in grid, cart, pickers; add/replace/remove on edit)
+- [ ] Choosing what's on the Sell grid; stock count correction; several codes per product
 - [ ] Shop setup (name) + first-20-items onboarding from a bill photo
 - [ ] Sell screen: favourites grid, barcode scan, cart, quantity keypad
 - [ ] Payment: cash with change calculator, QR (static first), udharo, split payment, discount/round-off
@@ -40,7 +41,7 @@ Gate: 3 pilot shops use it daily for 2 weeks.
 - [ ] Stock from bill photo (review list with confidence flags)
 - [ ] Voice entry on Sell, Stock and Udharo screens
 - [ ] Ask Bhunte chat (sales, stock, udharo questions)
-- [ ] Add a product from photos: front (thumbnail), barcode, label → AI fills the form (Claude Haiku via Cloud Function) — spec `docs/product-photos.md` (in review)
+- [x] Add a product from photos: front (thumbnail), barcode, label → AI fills the form (Claude Haiku via Cloud Function) — spec `docs/product-photos.md`
 - [ ] Product photo matching against the shop's own catalog
 
 ## Phase 3 — Polish & growth

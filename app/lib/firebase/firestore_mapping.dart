@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../core/barcode.dart';
@@ -167,6 +169,25 @@ Map<String, Object?> priceChangeToMap(PriceChange c, {required String createdBy}
   'createdAt': Timestamp.fromDate(c.createdAt),
   'createdBy': createdBy,
 };
+
+/// `productImages/{productId}`: the thumbnail as base64 (rules cap it at 80,000 characters).
+Map<String, Object?> productImageToMap(ProductImage i, {required String updatedBy}) => {
+  'jpegBase64': base64Encode(i.jpeg),
+  'width': i.width,
+  'height': i.height,
+  'updatedAt': FieldValue.serverTimestamp(),
+  'updatedBy': updatedBy,
+};
+
+ProductImage? productImageFromMap(Map<String, dynamic> m) {
+  final data = m['jpegBase64'];
+  if (data is! String || data.isEmpty) return null;
+  try {
+    return ProductImage(jpeg: base64Decode(data), width: _int(m['width']), height: _int(m['height']));
+  } on FormatException {
+    return null;
+  }
+}
 
 /// Tap-grid order: `sortOrder` first (missing = last), then English name.
 int compareProductDocs(DocumentSnapshot<Map<String, dynamic>> a, DocumentSnapshot<Map<String, dynamic>> b) {

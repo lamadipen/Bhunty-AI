@@ -15,6 +15,7 @@ import '../widgets/number_pad.dart';
 import 'add_stock_sheet.dart';
 import 'label_screen.dart';
 import 'new_product_screen.dart';
+import 'photo_capture_screen.dart';
 
 enum _Stage { pick, review, saved }
 
@@ -188,8 +189,8 @@ class _StockScreenState extends State<StockScreen> {
                 icon: Icons.photo_camera_outlined,
                 iconColor: BColors.green,
                 title: 'सामानको फोटो',
-                subtitle: 'चाँडै आउँदैछ',
-                onTap: () => showToast(context, 'सामानको फोटो चिन्ने सुविधा चाँडै आउँदैछ'),
+                subtitle: 'नयाँ सामान, फोटोबाट',
+                onTap: _fromPhotos,
               ),
             ),
           ],
@@ -307,6 +308,26 @@ class _StockScreenState extends State<StockScreen> {
   }
 
   Future<void> _newProduct() => NewProductScreen.open(context);
+
+  /// New product from photos (docs/product-photos.md); a photographed code
+  /// that is already in the shop goes to adding stock instead (F-4).
+  Future<void> _fromPhotos() async {
+    final outcome = await PhotoCaptureScreen.open(context);
+    if (!mounted) return;
+    switch (outcome) {
+      case PhotoFoundExisting(:final product):
+        final p = context.readStore.product(product.id);
+        if (p.archived) {
+          if (await offerUnhide(context, p) && mounted) await _addManually(context.readStore.product(p.id));
+        } else {
+          await _addManually(p);
+        }
+      case PhotoDraft():
+        await NewProductScreen.open(context, photos: outcome);
+      case null:
+        break;
+    }
+  }
 
   Future<void> _showHidden() async {
     final p = await showProductPicker(

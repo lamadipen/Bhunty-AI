@@ -40,6 +40,7 @@ class ShopStore extends ChangeNotifier {
   final Map<String, Customer> _customers;
   final List<Sale> _sales;
   final List<LedgerEntry> _ledger = [];
+  final Map<String, ProductImage> _images = {};
 
   // Stock and price history recorded on this device (Firestore keeps the full history).
   final List<Delivery> _deliveries = [];
@@ -55,8 +56,19 @@ class ShopStore extends ChangeNotifier {
   bool get isSynced => _backend != null;
 
   /// Replaces cached data with what the backend reports. Pass only what changed.
-  void replaceFromRemote({String? shopName, List<Product>? products, List<Customer>? customers, List<Sale>? sales}) {
+  void replaceFromRemote({
+    String? shopName,
+    List<Product>? products,
+    List<Customer>? customers,
+    List<Sale>? sales,
+    Map<String, ProductImage>? images,
+  }) {
     if (shopName != null) _shopName = shopName;
+    if (images != null) {
+      _images
+        ..clear()
+        ..addAll(images);
+    }
     if (products != null) {
       _products
         ..clear()
@@ -84,6 +96,9 @@ class ShopStore extends ChangeNotifier {
   List<Product> get favourites => _visible.where((p) => p.isFavourite).toList();
   List<Product> get lowStock => _visible.where((p) => p.isLow).toList();
   List<Product> get archivedProducts => _products.values.where((p) => p.archived).toList();
+
+  /// The product's thumbnail, if it has one.
+  ProductImage? image(String productId) => _images[productId];
 
   Product product(String id) => _products[id] ?? (throw ArgumentError('No product $id'));
 
@@ -454,7 +469,9 @@ class ShopStore extends ChangeNotifier {
     String? packName,
     int? packSizeMilli,
     LabelKind? labelKind,
+    ProductImage? image,
   }) {
+    _checkImage(image);
     final problem = validateNewProduct(
       nameNe: nameNe,
       pricePaisa: pricePaisa,
@@ -488,6 +505,8 @@ class ShopStore extends ChangeNotifier {
       priceSetAt: _now(),
     );
     _products[p.id] = p;
+    if (image != null) _images[p.id] = image;
+    final images = {p.id: ?image};
     PriceChange initial({String? batchId}) => PriceChange(
       id: _newId('price'),
       productId: p.id,
@@ -521,12 +540,13 @@ class ShopStore extends ChangeNotifier {
           delivery: change.delivery,
           batches: change.batches,
           priceChanges: [first],
+          images: images,
         ),
       );
     } else {
       final first = initial();
       _priceChanges.add(first);
-      _commit(ShopChange(newProducts: [p], priceChanges: [first]));
+      _commit(ShopChange(newProducts: [p], priceChanges: [first], images: images));
     }
     return _products[p.id]!;
   }
@@ -599,6 +619,24 @@ class ShopStore extends ChangeNotifier {
     _priceChanges.addAll(changes);
     _commit(ShopChange(updatedProducts: [p], priceChanges: changes));
     return p;
+  }
+
+  /// Adds, replaces or (with null) removes a product's thumbnail.
+  void setProductImage(String productId, ProductImage? image) {
+    product(productId);
+    _checkImage(image);
+    if (image == null) {
+      if (_images.remove(productId) == null) return;
+    } else {
+      _images[productId] = image;
+    }
+    _commit(ShopChange(images: {productId: image}));
+  }
+
+  void _checkImage(ProductImage? image) {
+    if (image != null && (image.jpeg.isEmpty || image.jpeg.length > ProductImage.maxBytes)) {
+      throw ArgumentError('Thumbnail must be 1–${ProductImage.maxBytes} bytes');
+    }
   }
 
   /// The unit can change only while there is no stock (it would change what the count means).

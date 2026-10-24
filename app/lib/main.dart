@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -12,6 +13,8 @@ import 'firebase/auth_service.dart';
 import 'firebase/firebase_config.dart';
 import 'firebase/firebase_root.dart';
 import 'firebase/firestore_backend.dart';
+import 'photos/cloud_photo_reader.dart';
+import 'photos/demo_photo_reader.dart';
 import 'scanning/scanner_screen.dart';
 
 /// `demo` (default): in-memory demo shop, no login.
@@ -35,7 +38,7 @@ Future<void> main() async {
   final BarcodeScanner scanner = _scanner == 'demo' ? DemoBarcodeScanner() : const CameraBarcodeScanner();
 
   if (_backend != 'firebase') {
-    runApp(BhunteApp(store: demoStore(), assistant: assistant, scanner: scanner));
+    runApp(BhunteApp(store: demoStore(), assistant: assistant, scanner: scanner, photoReader: DemoPhotoReader()));
     return;
   }
 
@@ -60,6 +63,7 @@ Future<void> main() async {
       openShop: (uid) => openFirestoreShop(db: db, uid: uid),
       assistant: assistant,
       scanner: scanner,
+      photoReader: CloudPhotoReader(FirebaseFunctions.instanceFor(region: CloudPhotoReader.region)),
       phoneLogin: _phoneLogin,
     ),
   );

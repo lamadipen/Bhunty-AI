@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import 'ai/assistant_service.dart';
 import 'data/shop_store.dart';
+import 'photos/photo_reader.dart';
+import 'photos/photo_source.dart';
 
 /// Hands the store and services to every screen. Widgets that read
 /// `context.store` in build rebuild when the store changes.
@@ -11,12 +13,16 @@ class AppScope extends InheritedNotifier<ShopStore> {
     required ShopStore store,
     required this.assistant,
     required this.scanner,
+    this.photoReader = const NoPhotoReader(),
+    this.photoSource = const DevicePhotoSource(),
     this.signOut,
     required super.child,
   }) : super(notifier: store);
 
   final AssistantService assistant;
   final BarcodeScanner scanner;
+  final PhotoReader photoReader;
+  final PhotoSource photoSource;
   final Future<void> Function()? signOut;
 
   static AppScope _of(BuildContext context, {required bool listen}) {
@@ -37,6 +43,8 @@ extension AppScopeContext on BuildContext {
 
   AssistantService get assistant => AppScope._of(this, listen: false).assistant;
   BarcodeScanner get scanner => AppScope._of(this, listen: false).scanner;
+  PhotoReader get photoReader => AppScope._of(this, listen: false).photoReader;
+  PhotoSource get photoSource => AppScope._of(this, listen: false).photoSource;
 
   /// Null in the demo (nobody is signed in).
   Future<void> Function()? get signOut => AppScope._of(this, listen: false).signOut;

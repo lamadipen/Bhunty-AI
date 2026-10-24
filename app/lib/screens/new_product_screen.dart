@@ -8,23 +8,33 @@ import '../data/models.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
 import '../labels/product_label.dart';
+import '../photos/photo_reader.dart';
+import '../photos/photo_source.dart';
 import '../widgets/number_pad.dart';
 import 'label_screen.dart';
+import 'photo_capture_screen.dart';
 
 /// Adds a product to the catalog, or edits one ([editing]). The name is
-/// typed once — the only text keyboard in the app — until voice/photo naming
-/// arrives (Phase 2). Numbers use the keypad. Returns the saved [Product], or null.
+/// typed once — the only text keyboard in the app — or filled from photos
+/// (docs/product-photos.md). Numbers use the keypad. Returns the saved [Product], or null.
 class NewProductScreen extends StatefulWidget {
-  const NewProductScreen({super.key, this.barcode, this.editing});
+  const NewProductScreen({super.key, this.barcode, this.editing, this.photos});
 
   /// Pre-filled when the user scanned a code that isn't in the catalog yet.
   final String? barcode;
 
+  /// What Bhunte read from photos; every field stays editable (PR1).
+  final PhotoDraft? photos;
+
   /// The product being edited; null when adding a new one.
   final Product? editing;
 
-  static Future<Product?> open(BuildContext context, {String? barcode}) =>
-      Navigator.of(context).push<Product>(MaterialPageRoute(builder: (_) => NewProductScreen(barcode: barcode)));
+  static Future<Product?> open(BuildContext context, {String? barcode, PhotoDraft? photos}) =>
+      Navigator.of(context).push<Product>(
+        MaterialPageRoute(
+          builder: (_) => NewProductScreen(barcode: barcode, photos: photos),
+        ),
+      );
 
   static Future<Product?> edit(BuildContext context, Product product) =>
       Navigator.of(context).push<Product>(MaterialPageRoute(builder: (_) => NewProductScreen(editing: product)));
@@ -67,6 +77,18 @@ class _NewProductScreenState extends State<NewProductScreen> {
   bool get _ownCode => _barcode != null && _isOwn;
   String? _error;
 
+  /// The thumbnail to save; when editing, starts as the product's current one.
+  ProductImage? _image;
+  bool _imageChanged = false;
+
+  /// Fields Bhunte filled from photos, and the ones it was unsure of (principle 8).
+  final Set<String> _aiFilled = {};
+  final Set<String> _aiUnsure = {};
+
+  /// MRP printed on the packet: a hint only, never saved (PR2).
+  int? _mrpHint;
+  String? _photoNote;
+
   @override
   void initState() {
     super.initState();
@@ -83,7 +105,112 @@ class _NewProductScreenState extends State<NewProductScreen> {
       _packSize = p.packSizeMilli == null ? '' : formatQty(p.packSizeMilli!);
       _barcode = p.barcode;
       _labelKind = p.labelKind ?? LabelKind.barcode;
+      _image = context.readStore.image(p.id);
     }
+    final photos = widget.photos;
+    if (photos != null) _applyPhotos(photos);
+  }
+
+  /// Fills the form from photos. Never touches price, cost or stock (PR2).
+  void _applyPhotos(PhotoDraft d) {
+    if (d.thumbnail != null) {
+      _image = d.thumbnail;
+      _imageChanged = true;
+    }
+    _aiFilled.clear();
+    _aiUnsure.clear();
+    void mark(String field, {bool unsure = false}) {
+      _aiFilled.add(field);
+      if (unsure) _aiUnsure.add(field);
+    }
+
+    final r = d.reading;
+    if (r != null) {
+      final low = r.lowConfidence;
+      if (r.unit != null) {
+        _unit = r.unit!;
+        mark('unit', unsure: low.contains('unit'));
+      }
+      // A size Bhunte was unsure of makes the name unsure too, since it is part of it.
+      final sizeUnsure = r.sizeText != null && low.contains('sizeText');
+      if (r.nameNe != null) {
+        _nameNe.text = nameWithSize(r.nameNe!, r.sizeText, _unit);
+        mark('nameNe', unsure: low.contains('nameNe') || sizeUnsure);
+      }
+      if (r.nameEn != null) {
+        _nameEn.text = nameWithSize(r.nameEn!, r.sizeText, _unit);
+        mark('nameEn', unsure: low.contains('nameEn') || sizeUnsure);
+      }
+      _mrpHint = r.mrpPaisa;
+    }
+    if (d.barcode != null) {
+      _barcode = d.barcode;
+      _isOwn = false;
+      if (d.barcodeByAi) mark('barcode', unsure: r?.lowConfidence.contains('barcode') ?? false);
+    }
+    _photoNote = [
+      ?d.problem?.message,
+      if (d.barcodeUnread && d.barcode == null) 'बारकोड पढ्न सकिएन — स्क्यान वा नम्बर लेख्नुस्',
+      if (r?.notes case final notes?) 'भुन्टे: $notes',
+    ].join('\n');
+    if (_photoNote!.isEmpty) _photoNote = null;
+    _error = null;
+  }
+
+  /// The user changed a field Bhunte filled: it is theirs now.
+  void _takeOver(String field) {
+    _aiFilled.remove(field);
+    _aiUnsure.remove(field);
+  }
+
+  Future<void> _fillFromPhotos() async {
+    _closeKeyboard();
+    final outcome = await PhotoCaptureScreen.open(context, offerExisting: false);
+    if (outcome is PhotoDraft && mounted) setState(() => _applyPhotos(outcome));
+  }
+
+  /// Adds or replaces the thumbnail from one photo (no AI).
+  Future<void> _pickPhoto() async {
+    _closeKeyboard();
+    final from = await showBhunteSheet<PhotoFrom>(
+      context,
+      (c) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('सामानको फोटो', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          BigButton(
+            key: const ValueKey('photo-from-camera'),
+            label: 'क्यामेरा',
+            icon: Icons.photo_camera_outlined,
+            onPressed: () => Navigator.pop(c, PhotoFrom.camera),
+          ),
+          const SizedBox(height: 8),
+          BigButton(
+            key: const ValueKey('photo-from-gallery'),
+            label: 'ग्यालरी/फाइल',
+            icon: Icons.photo_library_outlined,
+            outlineColor: BColors.green,
+            foreground: BColors.green,
+            onPressed: () => Navigator.pop(c, PhotoFrom.gallery),
+          ),
+        ],
+      ),
+    );
+    if (from == null || !mounted) return;
+    final source = context.photoSource;
+    final photo = await source.pick(context, from);
+    if (photo == null || !mounted) return;
+    final thumbnail = await source.thumbnail(photo);
+    if (!mounted) return;
+    if (thumbnail == null) {
+      showToast(context, 'फोटो खोल्न सकिएन');
+      return;
+    }
+    setState(() {
+      _image = thumbnail;
+      _imageChanged = true;
+    });
   }
 
   @override
@@ -123,6 +250,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
       setState(() {
         _barcode = code;
         _isOwn = false;
+        _takeOver('barcode');
       });
     }
   }
@@ -132,6 +260,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
     setState(() {
       _barcode = context.readStore.newInStoreCode();
       _isOwn = true;
+      _takeOver('barcode');
     });
   }
 
@@ -150,6 +279,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
     setState(() {
       _barcode = null;
       _isOwn = false;
+      _takeOver('barcode');
     });
   }
 
@@ -232,6 +362,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
       packName: _packName,
       packSizeMilli: packSize,
       labelKind: _labelKind,
+      image: _image,
     );
     showToast(context, '${product.nameNe} थपियो');
     if (product.hasOwnCode) {
@@ -268,6 +399,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
       setState(() => _error = '${e.message}');
       return;
     }
+    if (_imageChanged) store.setProductImage(old.id, _image);
     showToast(context, '${saved.nameNe} सुरक्षित भयो');
     if (!saved.hasOwnCode) {
       Navigator.pop(context, saved);
@@ -316,17 +448,41 @@ class _NewProductScreenState extends State<NewProductScreen> {
                 key: const ValueKey('new-product-list'),
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _label('सामानको नाम'),
-                  _textField(_nameNe, hint: 'जस्तै: नुन', big: true, key: const ValueKey('name-ne')),
-                  const SizedBox(height: 8),
-                  _textField(_nameEn, hint: 'English name (नभए पनि हुन्छ)', key: const ValueKey('name-en')),
+                  _photoSection(),
+                  if (_photoNote != null) ...[
+                    const SizedBox(height: 10),
+                    CardBox(
+                      key: const ValueKey('photo-note'),
+                      radius: 16,
+                      color: BColors.warnCard,
+                      borderColor: BColors.warnBorder,
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        _photoNote!,
+                        style: const TextStyle(fontSize: 16, color: BColors.warnInk, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
-                  _label('कसरी बेच्नुहुन्छ?'),
+                  _label('सामानको नाम', field: 'nameNe'),
+                  _textField(_nameNe, hint: 'जस्तै: नुन', big: true, key: const ValueKey('name-ne'), field: 'nameNe'),
+                  const SizedBox(height: 8),
+                  _textField(
+                    _nameEn,
+                    hint: 'English name (नभए पनि हुन्छ)',
+                    key: const ValueKey('name-en'),
+                    field: 'nameEn',
+                  ),
+                  const SizedBox(height: 16),
+                  _label('कसरी बेच्नुहुन्छ?', field: 'unit'),
                   _choices<Unit>(
                     values: unitLocked ? [_unit] : Unit.values,
                     selected: _unit,
                     label: (u) => u.ne,
-                    onPick: (u) => setState(() => _unit = u),
+                    onPick: (u) => setState(() {
+                      _unit = u;
+                      _takeOver('unit');
+                    }),
                   ),
                   if (unitLocked)
                     const Padding(
@@ -368,6 +524,15 @@ class _NewProductScreenState extends State<NewProductScreen> {
                       ),
                     ],
                   ),
+                  if (_mrpHint != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'प्याकेटमा MRP: ${formatRs(_mrpHint!)}',
+                        key: const ValueKey('mrp-hint'),
+                        style: const TextStyle(fontSize: 15, color: BColors.inkSoft, fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   if (price > 0 && _cost.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -460,7 +625,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
                     ],
                   ],
                   const SizedBox(height: 16),
-                  _label('बारकोड'),
+                  _label('बारकोड', field: 'barcode'),
                   if (_barcode == null) ...[
                     Row(
                       children: [
@@ -556,6 +721,9 @@ class _NewProductScreenState extends State<NewProductScreen> {
                   else
                     CardBox(
                       radius: 16,
+                      color: _aiUnsure.contains('barcode') ? BColors.warnCard : BColors.white,
+                      borderColor: _aiUnsure.contains('barcode') ? BColors.warnBorder : BColors.line,
+                      borderWidth: _aiUnsure.contains('barcode') ? 2 : 1,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       child: Row(
                         children: [
@@ -629,36 +797,135 @@ class _NewProductScreenState extends State<NewProductScreen> {
     );
   }
 
-  Widget _label(String text) => Padding(
+  /// [field]: shows the "भुन्टेले भरेको" tag while Bhunte's value is untouched.
+  Widget _label(String text, {String? field}) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
-    child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-  );
-
-  Widget _textField(TextEditingController c, {required String hint, bool big = false, Key? key}) => TextField(
-    key: key,
-    controller: c,
-    textInputAction: TextInputAction.done,
-    onChanged: (_) => setState(() => _error = null), // also refreshes the label preview
-    style: TextStyle(fontSize: big ? 22 : 17, fontWeight: big ? FontWeight.w700 : FontWeight.w400),
-    decoration: InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: BColors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: BColors.line),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: BColors.line),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: BColors.green, width: 2),
-      ),
+    child: Row(
+      children: [
+        Flexible(
+          child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        ),
+        if (field != null && _aiFilled.contains(field)) ...[
+          const SizedBox(width: 8),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: _AiTag(key: ValueKey('ai-$field'), unsure: _aiUnsure.contains(field)),
+            ),
+          ),
+        ],
+      ],
     ),
   );
+
+  Widget _photoSection() {
+    final image = _image;
+    return Row(
+      children: [
+        SizedBox(
+          width: 88,
+          height: 88,
+          child: image == null
+              ? DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: BColors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: BColors.line),
+                  ),
+                  child: const Icon(Icons.image_outlined, color: BColors.muted, size: 36),
+                )
+              : ClipRRect(
+                  key: const ValueKey('form-photo'),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.memory(image.jpeg, fit: BoxFit.cover, gaplessPlayback: true),
+                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!_isEdit) ...[
+                BigButton(
+                  key: const ValueKey('fill-from-photos'),
+                  label: 'फोटोबाट भर्नुस्',
+                  icon: Icons.auto_awesome_rounded,
+                  height: 52,
+                  fontSize: 18,
+                  onPressed: _fillFromPhotos,
+                ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: BigButton(
+                      key: const ValueKey('add-photo'),
+                      label: image == null ? 'फोटो थप्नुस्' : 'फोटो बदल्नुस्',
+                      outlineColor: BColors.line,
+                      foreground: BColors.ink,
+                      height: 48,
+                      fontSize: 16,
+                      onPressed: _pickPhoto,
+                    ),
+                  ),
+                  if (image != null) ...[
+                    const SizedBox(width: 8),
+                    RoundIconButton(
+                      key: const ValueKey('remove-photo'),
+                      icon: Icons.delete_outline_rounded,
+                      label: 'फोटो हटाउनुस्',
+                      size: 48,
+                      onPressed: () => setState(() {
+                        _image = null;
+                        _imageChanged = true;
+                      }),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _textField(TextEditingController c, {required String hint, bool big = false, Key? key, String? field}) {
+    final unsure = field != null && _aiUnsure.contains(field);
+    return TextField(
+      key: key,
+      controller: c,
+      textInputAction: TextInputAction.done,
+      // Also refreshes the label preview.
+      onChanged: (_) => setState(() {
+        _error = null;
+        if (field != null) _takeOver(field);
+      }),
+      style: TextStyle(fontSize: big ? 22 : 17, fontWeight: big ? FontWeight.w700 : FontWeight.w400),
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: unsure ? BColors.warnCard : BColors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: BColors.line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: unsure
+              ? const BorderSide(color: BColors.warnBorder, width: 2)
+              : const BorderSide(color: BColors.line),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: BColors.green, width: 2),
+        ),
+      ),
+    );
+  }
 
   Widget _choices<T>({
     required List<T> values,
@@ -707,5 +974,36 @@ class _NewProductScreenState extends State<NewProductScreen> {
           ),
         ),
     ],
+  );
+}
+
+/// Marks a field Bhunte filled from photos; orange when it was unsure (principle 8).
+class _AiTag extends StatelessWidget {
+  const _AiTag({super.key, required this.unsure});
+
+  final bool unsure;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    decoration: BoxDecoration(
+      color: unsure ? BColors.warnBg : BColors.greenTint,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.auto_awesome_rounded, size: 14, color: unsure ? BColors.warnInk : BColors.greenDark),
+        const SizedBox(width: 4),
+        Text(
+          unsure ? 'भुन्टेले भरेको · जाँच्नुस्' : 'भुन्टेले भरेको',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: unsure ? BColors.warnInk : BColors.greenDark,
+          ),
+        ),
+      ],
+    ),
   );
 }

@@ -130,6 +130,7 @@ class ShopChange {
     this.delivery,
     this.batches = const [],
     this.priceChanges = const [],
+    this.images = const {},
   });
 
   final Sale? sale;
@@ -163,6 +164,9 @@ class ShopChange {
   /// A `stock` change also moves its product's price; `initial` and `manual`
   /// changes travel with [newProducts] / [updatedProducts].
   final List<PriceChange> priceChanges;
+
+  /// productId → its new thumbnail, or null to remove it.
+  final Map<String, ProductImage?> images;
 }
 
 /// Where a `ShopStore` saves its changes. None (the demo) keeps everything in memory.

@@ -101,6 +101,23 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // A product's thumbnail (≈256 px JPEG as base64), one per product.
+      // 80,000 base64 characters = 60 KB; the app aims for about 30 KB.
+      match /productImages/{productId} {
+        allow read, delete: if isOwner(shopId);
+        allow create, update: if isOwner(shopId)
+          && incoming().jpegBase64 is string
+          && incoming().jpegBase64.size() > 0
+          && incoming().jpegBase64.size() <= 80000
+          && incoming().updatedBy == request.auth.uid;
+      }
+
+      // Daily AI read counts (photo reads, limit 100). Only the Cloud Function writes.
+      match /aiUsage/{day} {
+        allow read: if isOwner(shopId);
+        allow write: if false;
+      }
+
       // Written only by Cloud Functions (the Admin SDK bypasses these rules).
       match /dailySummaries/{day} {
         allow read: if isOwner(shopId);

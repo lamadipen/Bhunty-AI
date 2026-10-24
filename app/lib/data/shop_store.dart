@@ -7,6 +7,7 @@ import '../core/cash.dart';
 import '../core/money.dart';
 import '../core/nepal_time.dart';
 import '../core/qty.dart';
+import 'bill.dart';
 import 'models.dart';
 import 'proposed_action.dart';
 import 'shop_backend.dart';
@@ -41,6 +42,7 @@ class ShopStore extends ChangeNotifier {
   final List<Sale> _sales;
   final List<LedgerEntry> _ledger = [];
   final Map<String, ProductImage> _images = {};
+  final Map<String, String> _billAliases = {};
 
   // Stock and price history recorded on this device (Firestore keeps the full history).
   final List<Delivery> _deliveries = [];
@@ -62,8 +64,14 @@ class ShopStore extends ChangeNotifier {
     List<Customer>? customers,
     List<Sale>? sales,
     Map<String, ProductImage>? images,
+    Map<String, String>? billAliases,
   }) {
     if (shopName != null) _shopName = shopName;
+    if (billAliases != null) {
+      _billAliases
+        ..clear()
+        ..addAll(billAliases);
+    }
     if (images != null) {
       _images
         ..clear()
@@ -97,8 +105,16 @@ class ShopStore extends ChangeNotifier {
   List<Product> get lowStock => _visible.where((p) => p.isLow).toList();
   List<Product> get archivedProducts => _products.values.where((p) => p.archived).toList();
 
+  /// The product a bill line was matched to before (BR9), if it still exists.
+  String? productIdForBillText(String text) {
+    final id = _billAliases[normaliseBillText(text)];
+    return id != null && _products.containsKey(id) ? id : null;
+  }
+
   /// The product's thumbnail, if it has one.
   ProductImage? image(String productId) => _images[productId];
+
+  bool hasProduct(String id) => _products.containsKey(id);
 
   Product product(String id) => _products[id] ?? (throw ArgumentError('No product $id'));
 
@@ -313,6 +329,74 @@ class ShopStore extends ChangeNotifier {
     return change.delivery!;
   }
 
+  /// Saves the ticked rows of a bill as one delivery: a batch per row, their
+  /// share of VAT/discount in the cost, remembered bill names and any pack
+  /// sizes the user chose to keep — one write (docs/stock-from-bill.md BR2).
+  Delivery receiveBill(BillDraft bill) {
+    final rows = bill.ticked;
+    if (rows.isEmpty) throw ArgumentError('कुनै सामान छानिएको छैन');
+    final totals = bill.batchTotals();
+    final packUpdates = <Product>[];
+    final lines = <StockLine>[];
+    for (var i = 0; i < rows.length; i++) {
+      final r = rows[i];
+      final p = product(r.productId!);
+      final units = r.unitsMilli;
+      // A bill's pack for a product with none yet (BR6): kept on the product when asked.
+      final newPack = r.inPacks && !p.hasPack && r.packSizeMilli != null;
+      if (newPack && r.keepPack && packUpdates.every((u) => u.id != p.id)) {
+        packUpdates.add(p.withPack(r.packWord ?? 'प्याक', r.packSizeMilli!));
+      }
+      lines.add(
+        StockLine(
+          productId: p.id,
+          qtyMilli: units,
+          costPaisa: unitCostFromPack(totals[i], units),
+          totalCostPaisa: totals[i],
+          salePricePaisa: r.salePricePaisa,
+          packsMilli: r.inPacks ? r.qtyMilli + r.freeMilli : null,
+          packName: r.inPacks ? (p.hasPack ? p.packName : r.packWord ?? 'प्याक') : null,
+          packSizeMilli: r.inPacks ? r.packSizeMilli : null,
+          billLineText: r.text,
+        ),
+      );
+    }
+    final problem = validateStock(lines);
+    if (problem != null) throw ArgumentError(problem);
+    for (final u in packUpdates) {
+      _products[u.id] = u;
+    }
+    final h = bill.header;
+    final change = _stockChange(
+      lines,
+      bill.fromPhoto ? StockSource.billPhoto : StockSource.manual,
+      supplierName: h.supplierName,
+      supplierPhone: h.supplierPhone,
+      billNo: h.billNo,
+      billDateText: h.billDateText,
+      billTotalPaisa: h.totalPaisa,
+      vatPaisa: h.vatPaisa,
+      discountPaisa: h.discountPaisa,
+    );
+    final aliases = {
+      for (final r in rows)
+        if (r.text != null && normaliseBillText(r.text!).isNotEmpty) normaliseBillText(r.text!): r.productId!,
+    };
+    _billAliases.addAll(aliases);
+    _commit(
+      ShopChange(
+        stockDeltas: change.stockDeltas,
+        costUpdates: change.costUpdates,
+        delivery: change.delivery,
+        batches: change.batches,
+        priceChanges: change.priceChanges,
+        updatedProducts: packUpdates,
+        billAliases: aliases,
+      ),
+    );
+    return change.delivery!;
+  }
+
   ShopChange _stockChange(
     List<StockLine> lines,
     StockSource source, {
@@ -321,6 +405,10 @@ class ShopStore extends ChangeNotifier {
     String? supplierName,
     String? supplierPhone,
     String? billNo,
+    String? billDateText,
+    int? billTotalPaisa,
+    int? vatPaisa,
+    int? discountPaisa,
   }) {
     final now = _now();
     final deliveryId = _newId('delivery');
@@ -338,9 +426,10 @@ class ShopStore extends ChangeNotifier {
         productId: p.id,
         productName: p.nameNe,
         qtyMilli: l.qtyMilli,
-        packName: l.packsMilli == null ? null : p.packName,
-        packSizeMilli: l.packsMilli == null ? null : p.packSizeMilli,
+        packName: l.packsMilli == null ? null : (l.packName ?? p.packName),
+        packSizeMilli: l.packsMilli == null ? null : (l.packSizeMilli ?? p.packSizeMilli),
         packsMilli: l.packsMilli,
+        billLineText: l.billLineText,
         unitCostPaisa: l.costPaisa,
         totalCostPaisa: l.totalCostPaisa,
         salePricePaisa: salePrice,
@@ -376,6 +465,10 @@ class ShopStore extends ChangeNotifier {
       supplierName: clean(supplierName),
       supplierPhone: clean(supplierPhone),
       billNo: clean(billNo),
+      billDateText: clean(billDateText),
+      billTotalPaisa: billTotalPaisa,
+      vatPaisa: vatPaisa,
+      discountPaisa: discountPaisa,
     );
     _deliveries.add(delivery);
     _batches.addAll(batches);

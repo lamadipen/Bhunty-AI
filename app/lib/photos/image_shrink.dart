@@ -6,6 +6,9 @@ import '../data/models.dart';
 /// Longest side of a photo sent to the AI (PR7).
 const aiPhotoSide = 1024;
 
+/// Longest side of a bill page: small print needs more pixels (docs/stock-from-bill.md §2.1).
+const billPageSide = 1600;
+
 /// Longest side of a product thumbnail (PR7).
 const thumbnailSide = 256;
 

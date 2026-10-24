@@ -26,6 +26,10 @@ class Delivery {
     this.supplierName,
     this.supplierPhone,
     this.billNo,
+    this.billDateText,
+    this.billTotalPaisa,
+    this.vatPaisa,
+    this.discountPaisa,
   });
 
   final String id;
@@ -38,6 +42,14 @@ class Delivery {
   final String? supplierName;
   final String? supplierPhone;
   final String? billNo;
+
+  /// As printed on the bill (docs/stock-from-bill.md BR12).
+  final String? billDateText;
+
+  /// The bill's own total, VAT and discount, as printed or typed (BR5, Q1).
+  final int? billTotalPaisa;
+  final int? vatPaisa;
+  final int? discountPaisa;
 }
 
 /// One product's stock arriving in one delivery, with its own cost and sale
@@ -57,6 +69,7 @@ class Batch {
     this.packName,
     this.packSizeMilli,
     this.packsMilli,
+    this.billLineText,
   });
 
   final String id;
@@ -83,6 +96,9 @@ class Batch {
   final int salePricePaisa;
   final StockSource source;
   final DateTime createdAt;
+
+  /// The line as printed, for photo bills.
+  final String? billLineText;
 
   bool get enteredAsPack => packsMilli != null;
 
@@ -131,6 +147,7 @@ class ShopChange {
     this.batches = const [],
     this.priceChanges = const [],
     this.images = const {},
+    this.billAliases = const {},
   });
 
   final Sale? sale;
@@ -167,6 +184,9 @@ class ShopChange {
 
   /// productId → its new thumbnail, or null to remove it.
   final Map<String, ProductImage?> images;
+
+  /// Normalised bill text → productId, remembered for the next bill (BR9).
+  final Map<String, String> billAliases;
 }
 
 /// Where a `ShopStore` saves its changes. None (the demo) keeps everything in memory.

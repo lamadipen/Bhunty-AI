@@ -53,57 +53,6 @@ class DemoAssistantService implements AssistantService {
     await Future<void>.delayed(delay);
     return 'श्याम दाइ';
   }
-
-  @override
-  Future<List<BillLineProposal>> readBill() async {
-    await Future<void>.delayed(delay + const Duration(milliseconds: 300));
-    return [
-      BillLineProposal(
-        label: 'वाइवाइ (प्याकेट)',
-        productId: 'waiwai',
-        qtyMilli: 60 * milli,
-        costPaisa: rs(18),
-        confident: true,
-      ),
-      BillLineProposal(
-        label: 'चिनी 1 केजी',
-        productId: 'sugar',
-        qtyMilli: 25 * milli,
-        costPaisa: rs(105),
-        confident: true,
-      ),
-      BillLineProposal(
-        label: 'तेल 1 लिटर',
-        productId: 'oil',
-        qtyMilli: 12 * milli,
-        costPaisa: rs(250),
-        confident: true,
-      ),
-      BillLineProposal(
-        label: 'साबुन',
-        productId: 'soap',
-        qtyMilli: 24 * milli,
-        costPaisa: rs(45),
-        confident: false,
-        note: 'कुन साबुन? फोटो प्रस्ट भएन',
-      ),
-      BillLineProposal(
-        label: 'बिस्कुट',
-        productId: 'biscuit',
-        qtyMilli: 40 * milli,
-        costPaisa: rs(22),
-        confident: true,
-      ),
-      BillLineProposal(
-        label: 'दूध',
-        productId: 'milk',
-        qtyMilli: 8 * milli,
-        costPaisa: rs(48),
-        confident: false,
-        note: '3 हो कि 8? जाँच्नुस्',
-      ),
-    ];
-  }
 }
 
 class DemoBarcodeScanner implements BarcodeScanner {

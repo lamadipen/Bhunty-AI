@@ -5,7 +5,7 @@ Android · iOS · Web. Two modes:
 - **demo** (default): in-memory demo shop, no login. Nothing is saved.
 - **firebase**: the shop is saved in Firestore with offline persistence. Sign-in is **anonymous and automatic** for now (no login screen); phone OTP login is built but off — turn it on with `--dart-define=PHONE_LOGIN=true`.
 
-The AI backend is the scripted demo in both modes (Phase 2), except **adding a product from photos**: the demo uses a scripted reader, Firebase mode calls the `readProductPhotos` Cloud Function (`../functions/README.md`). Without the function deployed, photos still give the thumbnail and the barcode; the form says AI fill isn't available.
+The AI backend is the scripted demo in both modes (Phase 2), except **adding a product from photos** and **reading a bill photo**: the demo uses scripted readers, Firebase mode calls the `readProductPhotos` / `readBill` Cloud Functions (`../functions/README.md`). Without the function deployed, photos still give the thumbnail and the barcode; the form says AI fill isn't available.
 
 ```bash
 flutter pub get
@@ -54,6 +54,7 @@ cd ../rules-test && npm install && npm test
 | New product (not in the prototype) | `lib/screens/new_product_screen.dart` |
 | Add a product from photos (front, barcode, label) | `lib/screens/photo_capture_screen.dart`, `lib/photos/` |
 | Webcam capture (desktop browsers) | `lib/photos/webcam_screen.dart` |
+| Bill: photo → check → save, or manual bill | `lib/screens/bill_capture_screen.dart`, `lib/screens/bill_screen.dart`, `lib/bills/`, `lib/data/bill.dart` |
 | Print own barcode/QR labels | `lib/screens/label_screen.dart`, `lib/labels/` |
 | Camera scanner + type-the-number | `lib/scanning/` |
 | 4 · Udharo (credit) | `lib/screens/udharo_screen.dart` |
@@ -69,6 +70,7 @@ lib/
   firebase/    FirestoreBackend (batched writes + listeners), Firestore mapping, phone auth, auth gate
   ai/          AssistantService + BarcodeScanner interfaces, demo implementations, code-built answers
   photos/      PhotoReader (Cloud Function client + demo), PhotoSource (camera/gallery, barcode from photo), shrinking
+  bills/       BillReader (Cloud Function client + demo), mapping AI lines to bill rows
   widgets/     header, big buttons, keypad, sheets, toast
   theme/       colours and Mukta font
 assets/fonts/  Mukta (bundled so Devanagari works offline; OFL licence included)

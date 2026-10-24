@@ -24,7 +24,8 @@ class PickedPhoto {
 abstract interface class PhotoSource {
   /// A photo from the camera or the gallery / files; null if the user cancelled
   /// or the file wasn't an image. The camera may open a screen, hence [context].
-  Future<PickedPhoto?> pick(BuildContext context, PhotoFrom from);
+  /// Bills need more detail than products: pass a larger [maxSide].
+  Future<PickedPhoto?> pick(BuildContext context, PhotoFrom from, {int maxSide = aiPhotoSide});
 
   /// A checked product code read on the phone from [photo] (free, offline);
   /// null on the web or when none is found (PR3).
@@ -44,12 +45,12 @@ class DevicePhotoSource implements PhotoSource {
       kIsWeb && defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS;
 
   @override
-  Future<PickedPhoto?> pick(BuildContext context, PhotoFrom from) async {
+  Future<PickedPhoto?> pick(BuildContext context, PhotoFrom from, {int maxSide = aiPhotoSide}) async {
     if (from == PhotoFrom.camera && usesWebcam) {
       switch (await WebcamScreen.open(context)) {
         case WebcamPhoto(:final bytes):
           try {
-            return PickedPhoto(jpeg: await shrinkToJpeg(bytes));
+            return PickedPhoto(jpeg: await shrinkToJpeg(bytes, maxSide: maxSide, quality: 85));
           } catch (e) {
             debugPrint('Bhunte: webcam photo unreadable: $e');
             return null;
@@ -64,12 +65,16 @@ class DevicePhotoSource implements PhotoSource {
       // The picker shrinks on Android/iOS/web; shrinkToJpeg makes sure of it everywhere.
       final file = await ImagePicker().pickImage(
         source: from == PhotoFrom.camera ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: aiPhotoSide.toDouble(),
-        maxHeight: aiPhotoSide.toDouble(),
+        maxWidth: maxSide.toDouble(),
+        maxHeight: maxSide.toDouble(),
         imageQuality: 85,
       );
       if (file == null) return null;
-      final jpeg = await shrinkToJpeg(await file.readAsBytes());
+      final jpeg = await shrinkToJpeg(
+        await file.readAsBytes(),
+        maxSide: maxSide,
+        quality: maxSide > aiPhotoSide ? 85 : 80,
+      );
       return PickedPhoto(jpeg: jpeg, path: kIsWeb ? null : file.path);
     } catch (e) {
       debugPrint('Bhunte: photo pick failed: $e');

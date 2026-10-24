@@ -38,7 +38,7 @@ const fakeModel = (result: ModelAnswer | "unreadable" | Error): ModelReader & { 
 const fakeQuota = (used = 0): Quota & { used: number } => {
   const q = {
     used,
-    async take(_shop: string, limit: number) {
+    async take(_shop: string, _counter: string, limit: number) {
       if (q.used >= limit) return null;
       return ++q.used;
     },

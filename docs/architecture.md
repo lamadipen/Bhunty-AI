@@ -45,9 +45,13 @@ shops/{shopId}                        # shopId = owner's uid for now (one owner,
     payments: [{method: "cash"|"qr"|"udharo", amountPaisa}],
     tenderedPaisa?, changePaisa?, customerId?,
     createdAt (client), syncedAt (server), day (yyyy-mm-dd, NPT), createdBy (uid), voidedAt?
-  stockEntries/{entryId}
+  stockEntries/{entryId}               # today; to be replaced by deliveries + batches + priceChanges
     source: "bill_photo" | "product_photo" | "voice" | "manual",
     photoUrl?, lines: [{productId, qtyMilli, costPaisa}], totalPaisa, createdAt, createdBy
+  # Planned (spec + test scenarios: docs/product-addition.md):
+  # deliveries/{id}    one bill/save: source, supplierName?, supplierPhone?, billNo?, totalCostPaisa
+  # batches/{id}       one product per delivery: qtyMilli, unitCostPaisa, totalCostPaisa, salePricePaisa
+  # priceChanges/{id}  initial | stock | manual; product price = newest by createdAt
   customers/{customerId}
     name, initial, phone?, balancePaisa, lastNote, lastActivityAt
     ledger/{entryId}

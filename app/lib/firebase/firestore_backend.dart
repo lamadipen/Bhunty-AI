@@ -65,6 +65,12 @@ class FirestoreBackend implements ShopBackend {
     );
     c.costUpdates.forEach((id, cost) => productFields.putIfAbsent(id, () => {})['costPaisa'] = cost);
     c.labelKinds.forEach((id, kind) => productFields.putIfAbsent(id, () => {})['labelKind'] = kind.name);
+    // A batch at a new price moves the product's price (initial/manual travel with the product doc).
+    for (final pc in c.priceChanges.where((pc) => pc.reason == PriceReason.stock)) {
+      productFields.putIfAbsent(pc.productId, () => {})
+        ..['pricePaisa'] = pc.newPricePaisa
+        ..['priceSetAt'] = Timestamp.fromDate(pc.createdAt);
+    }
     productFields.forEach((id, fields) => batch.update(_products.doc(id), fields));
     for (final nc in c.newCustomers) {
       batch.set(_customers.doc(nc.id), {...customerToMap(nc), 'createdAt': FieldValue.serverTimestamp()});
@@ -79,9 +85,15 @@ class FirestoreBackend implements ShopBackend {
     }
     c.customerNotes.forEach((id, note) => customerFields.putIfAbsent(id, () => {})['lastNote'] = note);
     customerFields.forEach((id, fields) => batch.set(_customers.doc(id), fields, SetOptions(merge: true)));
-    final entry = c.stockEntry;
-    if (entry != null) {
-      batch.set(shop.collection('stockEntries').doc(entry.id), stockEntryToMap(entry, createdBy: uid));
+    final delivery = c.delivery;
+    if (delivery != null) {
+      batch.set(shop.collection('deliveries').doc(delivery.id), deliveryToMap(delivery, createdBy: uid));
+    }
+    for (final b in c.batches) {
+      batch.set(shop.collection('batches').doc(b.id), batchToMap(b, createdBy: uid));
+    }
+    for (final pc in c.priceChanges) {
+      batch.set(shop.collection('priceChanges').doc(pc.id), priceChangeToMap(pc, createdBy: uid));
     }
     // Not awaited: offline, this future only completes after the next sync.
     unawaited(

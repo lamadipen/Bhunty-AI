@@ -10,7 +10,10 @@ import '../data/shop_backend.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/product_tile.dart';
+import '../widgets/delivery_info.dart';
+import '../widgets/number_pad.dart';
 import 'add_stock_sheet.dart';
+import 'label_screen.dart';
 import 'new_product_screen.dart';
 
 enum _Stage { pick, review, saved }
@@ -21,6 +24,9 @@ class _Row {
   final BillLineProposal proposal;
   int qtyMilli;
   bool on;
+
+  /// Sale price from now on; starts at the product's current price (S-6).
+  int? salePricePaisa;
 }
 
 class StockScreen extends StatefulWidget {
@@ -35,6 +41,7 @@ class _StockScreenState extends State<StockScreen> {
   String? _busy;
   List<_Row> _rows = [];
   int _savedCount = 0;
+  DeliveryInfo _billInfo = const DeliveryInfo();
 
   Future<void> _shootBill() async {
     setState(() => _busy = 'बिल');
@@ -42,7 +49,8 @@ class _StockScreenState extends State<StockScreen> {
     if (!mounted) return;
     setState(() {
       _busy = null;
-      _rows = [for (final l in lines) _Row(l)];
+      final store = context.readStore;
+      _rows = [for (final l in lines) _Row(l)..salePricePaisa = store.product(l.productId).pricePaisa];
       _stage = _Stage.review;
     });
   }
@@ -89,10 +97,21 @@ class _StockScreenState extends State<StockScreen> {
   void _save() {
     final selected = _rows.where((r) => r.on && r.qtyMilli > 0).toList();
     if (selected.isEmpty) return;
-    context.readStore.addStock([
-      for (final r in selected)
-        StockLine(productId: r.proposal.productId, qtyMilli: r.qtyMilli, costPaisa: r.proposal.costPaisa),
-    ], source: StockSource.billPhoto);
+    context.readStore.addStock(
+      [
+        for (final r in selected)
+          StockLine(
+            productId: r.proposal.productId,
+            qtyMilli: r.qtyMilli,
+            costPaisa: r.proposal.costPaisa,
+            salePricePaisa: r.salePricePaisa,
+          ),
+      ],
+      source: StockSource.billPhoto,
+      supplierName: _billInfo.supplierName,
+      supplierPhone: _billInfo.supplierPhone,
+      billNo: _billInfo.billNo,
+    );
     setState(() {
       _savedCount = selected.length;
       _stage = _Stage.saved;
@@ -250,10 +269,26 @@ class _StockScreenState extends State<StockScreen> {
   }
 
   Future<void> _addManually(Product p) async {
-    final line = await showBhunteSheet<StockLine>(context, (c) => AddStockSheet(product: p));
-    if (line == null || !mounted) return;
-    context.readStore.addStock([line], source: StockSource.manual);
-    showToast(context, '${p.nameNe} + ${formatQty(line.qtyMilli)} ${p.unit.ne} स्टकमा थपियो');
+    final arrival = await showBhunteSheet<StockArrival>(context, (c) => AddStockSheet(product: p));
+    if (arrival == null || !mounted) return;
+    final store = context.readStore;
+    final oldPrice = store.product(p.id).pricePaisa;
+    final line = arrival.line;
+    store.addStock(
+      [line],
+      source: StockSource.manual,
+      supplierName: arrival.info.supplierName,
+      supplierPhone: arrival.info.supplierPhone,
+      billNo: arrival.info.billNo,
+    );
+    final now = store.product(p.id);
+    final priceChanged = now.pricePaisa != oldPrice;
+    showToast(
+      context,
+      '${p.nameNe} + ${formatQty(line.qtyMilli)} ${p.unit.ne} स्टकमा थपियो'
+      '${priceChanged ? ' · अब ${formatRs(now.pricePaisa)}' : ''}',
+    );
+    if (priceChanged && now.hasOwnCode) await offerReprint(context, now, oldPrice);
   }
 
   Future<void> _scanForStock() async {
@@ -281,6 +316,21 @@ class _StockScreenState extends State<StockScreen> {
       caption: (_) => 'थिचेर फेरि देखाउनुस्',
     );
     if (p != null && mounted) await NewProductScreen.edit(context, p);
+  }
+
+  Future<void> _editRowPrice(_Row row) async {
+    final current = row.salePricePaisa ?? 0;
+    final text = await showNumberPad(
+      context,
+      title: '${row.proposal.label} · बेच्ने मूल्य',
+      initial: current == 0 ? '' : formatAmount(current).replaceAll(',', ''),
+      allowDecimal: true,
+      maxDecimals: 2,
+      prefix: 'रु ',
+    );
+    if (text == null || !mounted) return;
+    final paisa = parseMoneyPaisa(text);
+    if (paisa > 0) setState(() => row.salePricePaisa = paisa);
   }
 
   Widget _review() {
@@ -340,6 +390,7 @@ class _StockScreenState extends State<StockScreen> {
               onToggle: () => setState(() => _rows[i].on = !_rows[i].on),
               onDec: () => setState(() => _rows[i].qtyMilli = (_rows[i].qtyMilli - milli).clamp(0, 1 << 30)),
               onInc: () => setState(() => _rows[i].qtyMilli += milli),
+              onPrice: () => _editRowPrice(_rows[i]),
             ),
           ),
         ),
@@ -360,7 +411,7 @@ class _StockScreenState extends State<StockScreen> {
                   Text(formatRs(total), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                 ],
               ),
-              const SizedBox(height: 8),
+              DeliveryInfoButton(info: _billInfo, onChanged: (v) => setState(() => _billInfo = v)),
               BigButton(
                 label: 'स्टकमा थप्नुस् (${selected.length})',
                 trailingIcon: Icons.check_rounded,
@@ -503,6 +554,7 @@ class _BillRow extends StatelessWidget {
     required this.onToggle,
     required this.onDec,
     required this.onInc,
+    required this.onPrice,
   });
 
   final _Row row;
@@ -510,6 +562,7 @@ class _BillRow extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onDec;
   final VoidCallback onInc;
+  final VoidCallback onPrice;
 
   @override
   Widget build(BuildContext context) {
@@ -563,6 +616,12 @@ class _BillRow extends StatelessWidget {
                     row.proposal.note!,
                     style: const TextStyle(fontSize: 14, color: BColors.warnInk, fontWeight: FontWeight.w700),
                   ),
+                _SalePriceChip(
+                  key: ValueKey('bill-price-${product.id}'),
+                  price: row.salePricePaisa ?? product.pricePaisa,
+                  changed: (row.salePricePaisa ?? product.pricePaisa) != product.pricePaisa,
+                  onTap: onPrice,
+                ),
               ],
             ),
           ),
@@ -589,6 +648,46 @@ class _BillRow extends StatelessWidget {
             onPressed: onInc,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "बेच्ने: रु 25 ✎" on a bill line; green when it changes the price.
+class _SalePriceChip extends StatelessWidget {
+  const _SalePriceChip({super.key, required this.price, required this.changed, required this.onTap});
+
+  final int price;
+  final bool changed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'बेच्ने मूल्य ${formatRs(price)}, बदल्न थिच्नुस्',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'बेच्ने: ${formatRs(price)}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: changed ? BColors.greenDark : BColors.ink,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.edit_outlined, size: 18, color: changed ? BColors.greenDark : BColors.inkSoft),
+            ],
+          ),
+        ),
       ),
     );
   }

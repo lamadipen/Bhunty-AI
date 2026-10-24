@@ -22,14 +22,21 @@ class Product {
     this.labelKind,
     this.ownCode = false,
     this.archived = false,
+    this.priceSetAt,
   });
 
   final String id;
   final String nameNe;
   final String nameEn;
 
-  /// Price per one [unit].
+  /// Sale price per one [unit]: the newest price change. One price for all
+  /// stock, old batches and new (docs/product-addition.md, R1).
   final int pricePaisa;
+
+  /// When [pricePaisa] was set; "latest" is by this time (R6).
+  final DateTime? priceSetAt;
+
+  /// Unit cost of the newest batch — a reference only, never averaged (R9).
   final int costPaisa;
   final Unit unit;
   final int stockMilli;
@@ -87,28 +94,31 @@ class Product {
     labelKind: labelKind,
     ownCode: ownCode,
     archived: archived,
+    priceSetAt: priceSetAt,
   );
 
-  Product copyWith({int? stockMilli, int? costPaisa, LabelKind? labelKind}) => Product(
-    id: id,
-    nameNe: nameNe,
-    nameEn: nameEn,
-    pricePaisa: pricePaisa,
-    costPaisa: costPaisa ?? this.costPaisa,
-    unit: unit,
-    stockMilli: stockMilli ?? this.stockMilli,
-    lowStockAtMilli: lowStockAtMilli,
-    letter: letter,
-    tileBg: tileBg,
-    tileInk: tileInk,
-    barcode: barcode,
-    isFavourite: isFavourite,
-    packName: packName,
-    packSizeMilli: packSizeMilli,
-    labelKind: labelKind ?? this.labelKind,
-    ownCode: ownCode,
-    archived: archived,
-  );
+  Product copyWith({int? stockMilli, int? costPaisa, int? pricePaisa, DateTime? priceSetAt, LabelKind? labelKind}) =>
+      Product(
+        id: id,
+        nameNe: nameNe,
+        nameEn: nameEn,
+        pricePaisa: pricePaisa ?? this.pricePaisa,
+        costPaisa: costPaisa ?? this.costPaisa,
+        unit: unit,
+        stockMilli: stockMilli ?? this.stockMilli,
+        lowStockAtMilli: lowStockAtMilli,
+        letter: letter,
+        tileBg: tileBg,
+        tileInk: tileInk,
+        barcode: barcode,
+        isFavourite: isFavourite,
+        packName: packName,
+        packSizeMilli: packSizeMilli,
+        labelKind: labelKind ?? this.labelKind,
+        ownCode: ownCode,
+        archived: archived,
+        priceSetAt: priceSetAt ?? this.priceSetAt,
+      );
 }
 
 class Customer {
@@ -199,9 +209,22 @@ class Sale {
   final String? customerId;
 }
 
+/// One product arriving, as entered. Becomes a `Batch` when saved.
 class StockLine {
-  StockLine({required this.productId, required this.qtyMilli, required this.costPaisa, int? totalCostPaisa})
-    : totalCostPaisa = totalCostPaisa ?? lineTotal(costPaisa, qtyMilli);
+  StockLine({
+    required this.productId,
+    required this.qtyMilli,
+    required this.costPaisa,
+    int? totalCostPaisa,
+    this.salePricePaisa,
+    this.packsMilli,
+  }) : totalCostPaisa = totalCostPaisa ?? lineTotal(costPaisa, qtyMilli);
+
+  /// New sale price per selling unit; null keeps the current price.
+  final int? salePricePaisa;
+
+  /// How many packs were entered, when entered in packs (pack name/size come from the product).
+  final int? packsMilli;
 
   final String productId;
 

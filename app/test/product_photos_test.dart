@@ -35,7 +35,8 @@ class FakePhotoSource implements PhotoSource {
   final String? barcode;
 
   @override
-  Future<PickedPhoto?> pick(BuildContext context, PhotoFrom from) async => PickedPhoto(jpeg: _jpeg, path: 'photo.jpg');
+  Future<PickedPhoto?> pick(BuildContext context, PhotoFrom from, {int maxSide = aiPhotoSide}) async =>
+      PickedPhoto(jpeg: _jpeg, path: 'photo.jpg');
 
   @override
   Future<String?> readBarcode(PickedPhoto photo) async => barcode;

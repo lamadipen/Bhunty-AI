@@ -1,6 +1,6 @@
 # Stock from a bill — photo (AI) and manual bill — spec and test scenarios
 
-Status: **approved** (2026-10-24), not implemented yet. The answers to the open questions in §7 were accepted as recommended.
+Status: **implemented** (2026-10-24) — `app/lib/data/bill.dart`, `app/lib/bills/`, `app/lib/screens/bill_screen.dart`, `bill_capture_screen.dart`, `functions/src/bill.ts`. Tests: `app/test/bill_test.dart` (MB, money), `app/test/bill_photo_test.dart` (BL), `functions/test/bill.test.ts`, `rules-test/`. The answers to the questions in §7 were accepted as recommended.
 Builds on [product-addition.md](product-addition.md) — every rule there still applies (batches, price changes, packs, R1–R13) — and on [product-photos.md](product-photos.md) (photo capture, Cloud Function, daily limit).
 
 Scope: receiving **one wholesaler delivery with several products in one save**, either by photographing the bill (AI reads it) or by building the bill by hand.
@@ -58,7 +58,7 @@ Footer: "छानिएको जम्मा रु Y" and, when a bill total 
 
 **BR3 — Line money.** Quantity is in selling units after pack conversion (R10). Unit cost = line amount ÷ quantity (incl. free items), rounded to the paisa; the batch keeps the line amount exactly as total. If only the rate is known: amount = qty × rate, computed in code.
 
-**BR4 — Line check.** When qty, rate and amount are all read: |qty × rate − amount| > रु 1 → row is **Check**. (Rounding on bills is common; ≤ रु 1 is accepted.)
+**BR4 — Line check.** When qty, rate and amount are all read: |qty × rate − amount| > रु 1 → row is **Check** and can't be ticked until opened; the row sheet starts from qty × rate. (Rounding on bills is common; ≤ रु 1 is accepted.)
 
 **BR5 — Bill check.** When the bill total is read or typed: sum of all lines (ticked or not) − discount + VAT ≠ total (± रु 1) → orange banner "बिलको जम्मा मिलेन". Saving is still allowed.
 
@@ -93,7 +93,7 @@ deliveries/{id}                      # existing; new optional fields
 batches/{id}                         # existing; new optional field
   billLineText?                      # the line as printed (photo bills)
 
-billAliases/{aliasId}                # new; aliasId = hash of the normalised text
+billAliases/{aliasId}                # new; aliasId = the normalised text, URI-encoded (same on every device)
   text, productId, updatedAt, updatedBy
 
 aiUsage/{yyyy-mm-dd}
@@ -104,7 +104,7 @@ aiUsage/{yyyy-mm-dd}
 
 ```
 in:  { pages: [ jpegBase64 ],                                   # 1–3, ≤ 700 KB each
-       catalog: [ { id, ne, en, unit, packName?, packSize? } ] } # visible products, ≤ 1,000
+       catalog: [ { id, ne, en, unit, packName?, packSize? } ] } # all products, hidden too (BR8), ≤ 1,000
 out: { supplierName?, supplierPhone?, billNo?, billDateText?,
        totalPaisa?, vatPaisa?, discountPaisa?,
        lines: [ { text,                                          # as printed, ≤ 80 chars
@@ -126,7 +126,7 @@ Security rules: `billAliases` owner read/write, `text` string ≤ 120, `productI
 
 ## 5. Scenarios (test reference)
 
-Catalog for all scenarios (demo shop): वाइवाइ (प्याकेट, pack कार्टुन × 30, price ₹18, cost ₹13), अण्डा (वटा, ₹20), चिनी (केजी, ₹120), तेल (लिटर, ₹280), साबुन (वटा, ₹60), बिस्कुट (प्याकेट, ₹30), Coke 500ml (वटा, no pack, ₹60). "AI returns" = the faked function reply in tests.
+Catalog for all scenarios: the demo shop — वाइवाइ (प्याकेट, pack कार्टुन × 30), अण्डा (वटा, ₹20), चिनी (केजी, ₹120), तेल (लिटर, ₹280), साबुन (वटा, ₹60), बिस्कुट (प्याकेट, ₹30) — plus Coke 500ml (वटा, no pack, ₹60). "AI returns" = the faked function reply in tests.
 
 ### BL — Bill photo
 

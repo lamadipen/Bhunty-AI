@@ -4,6 +4,7 @@ import '../app_scope.dart';
 import '../core/product_code.dart';
 import '../data/models.dart';
 import '../photos/photo_reader.dart';
+import '../photos/photo_slot.dart';
 import '../photos/photo_source.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
@@ -197,8 +198,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       for (final (role, title, hint) in _slots) ...[
-                        _Slot(
-                          role: role,
+                        PhotoSlot(
+                          id: role.wire,
+                          icon: switch (role) {
+                            PhotoRole.front => Icons.inventory_2_outlined,
+                            PhotoRole.barcode => Icons.qr_code_2_rounded,
+                            PhotoRole.label => Icons.text_snippet_outlined,
+                          },
                           title: title,
                           hint: hint,
                           photo: _photos[role],
@@ -269,145 +275,4 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
       ),
     );
   }
-}
-
-class _Slot extends StatelessWidget {
-  const _Slot({
-    required this.role,
-    required this.title,
-    required this.hint,
-    required this.photo,
-    required this.onPick,
-    required this.onRemove,
-  });
-
-  final PhotoRole role;
-  final String title;
-  final String hint;
-  final PickedPhoto? photo;
-  final ValueChanged<PhotoFrom> onPick;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = this.photo;
-    return CardBox(
-      key: ValueKey('slot-${role.wire}'),
-      radius: 18,
-      borderColor: photo == null ? BColors.line : BColors.green,
-      borderWidth: photo == null ? 1 : 2,
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 88,
-            height: 88,
-            child: photo == null
-                ? DecoratedBox(
-                    decoration: BoxDecoration(color: BColors.ground, borderRadius: BorderRadius.circular(14)),
-                    child: Icon(_icon, color: BColors.muted, size: 36),
-                  )
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.memory(photo.jpeg, fit: BoxFit.cover, gaplessPlayback: true, cacheWidth: 264),
-                  ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                    ),
-                    if (photo != null)
-                      RoundIconButton(
-                        key: ValueKey('remove-${role.wire}'),
-                        icon: Icons.close_rounded,
-                        label: 'फोटो हटाउनुस्',
-                        size: 44,
-                        onPressed: onRemove,
-                      ),
-                  ],
-                ),
-                Text(hint, style: const TextStyle(fontSize: 14, color: BColors.inkSoft)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SmallButton(
-                        key: ValueKey('camera-${role.wire}'),
-                        icon: photo == null ? Icons.photo_camera_outlined : Icons.refresh_rounded,
-                        label: photo == null ? 'क्यामेरा' : 'फेरि खिच्नुस्',
-                        onTap: () => onPick(PhotoFrom.camera),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _SmallButton(
-                        key: ValueKey('gallery-${role.wire}'),
-                        icon: Icons.photo_library_outlined,
-                        label: 'ग्यालरी/फाइल',
-                        onTap: () => onPick(PhotoFrom.gallery),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData get _icon => switch (role) {
-    PhotoRole.front => Icons.inventory_2_outlined,
-    PhotoRole.barcode => Icons.qr_code_2_rounded,
-    PhotoRole.label => Icons.text_snippet_outlined,
-  };
-}
-
-class _SmallButton extends StatelessWidget {
-  const _SmallButton({super.key, required this.icon, required this.label, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    label: label,
-    excludeSemantics: true,
-    child: Material(
-      color: BColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: BColors.line, width: 2),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 48,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 22, color: BColors.green),
-              const SizedBox(width: 6),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }

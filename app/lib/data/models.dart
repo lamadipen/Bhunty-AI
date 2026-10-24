@@ -234,13 +234,22 @@ class StockLine {
     int? totalCostPaisa,
     this.salePricePaisa,
     this.packsMilli,
+    this.packName,
+    this.packSizeMilli,
+    this.billLineText,
   }) : totalCostPaisa = totalCostPaisa ?? lineTotal(costPaisa, qtyMilli);
 
   /// New sale price per selling unit; null keeps the current price.
   final int? salePricePaisa;
 
-  /// How many packs were entered, when entered in packs (pack name/size come from the product).
+  /// How many packs were entered, when entered in packs (pack name/size come from the product
+  /// unless [packName]/[packSizeMilli] are given, e.g. a bill's "crate" for a product with no pack).
   final int? packsMilli;
+  final String? packName;
+  final int? packSizeMilli;
+
+  /// The bill line as printed, for photo bills.
+  final String? billLineText;
 
   final String productId;
 
@@ -252,28 +261,6 @@ class StockLine {
 
   /// What the line cost in total, exactly as on the bill (e.g. 2 cartons × रु 900).
   final int totalCostPaisa;
-}
-
-/// One line the AI read from a wholesaler bill. Not stock until the user ticks it.
-class BillLineProposal {
-  const BillLineProposal({
-    required this.label,
-    required this.productId,
-    required this.qtyMilli,
-    required this.costPaisa,
-    required this.confident,
-    this.note,
-  });
-
-  /// Text as read from the bill.
-  final String label;
-  final String productId;
-  final int qtyMilli;
-  final int costPaisa;
-
-  /// When false the row starts unticked and highlighted (principle 8).
-  final bool confident;
-  final String? note;
 }
 
 class TopItem {

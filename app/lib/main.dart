@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'ai/assistant_service.dart';
 import 'ai/demo_services.dart';
 import 'app.dart';
+import 'bills/cloud_bill_reader.dart';
+import 'bills/demo_bill_reader.dart';
 import 'data/demo_data.dart';
 import 'firebase/auth_service.dart';
 import 'firebase/firebase_config.dart';
@@ -38,7 +40,15 @@ Future<void> main() async {
   final BarcodeScanner scanner = _scanner == 'demo' ? DemoBarcodeScanner() : const CameraBarcodeScanner();
 
   if (_backend != 'firebase') {
-    runApp(BhunteApp(store: demoStore(), assistant: assistant, scanner: scanner, photoReader: DemoPhotoReader()));
+    runApp(
+      BhunteApp(
+        store: demoStore(),
+        assistant: assistant,
+        scanner: scanner,
+        photoReader: DemoPhotoReader(),
+        billReader: DemoBillReader(),
+      ),
+    );
     return;
   }
 
@@ -64,6 +74,7 @@ Future<void> main() async {
       assistant: assistant,
       scanner: scanner,
       photoReader: CloudPhotoReader(FirebaseFunctions.instanceFor(region: CloudPhotoReader.region)),
+      billReader: CloudBillReader(FirebaseFunctions.instanceFor(region: CloudPhotoReader.region)),
       phoneLogin: _phoneLogin,
     ),
   );

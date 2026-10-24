@@ -45,7 +45,7 @@ class CloudPhotoReader implements PhotoReader {
 
   /// The function's own errors carry their reason as the message; a network
   /// failure arrives as `unavailable` / `deadline-exceeded` with another message.
-  @visibleForTesting
+  /// Shared with the bill reader (same error contract).
   static PhotoReadProblem problemFor(String code, String? message) => switch ((code, message)) {
     ('resource-exhausted', _) => PhotoReadProblem.limitReached,
     ('failed-precondition', 'unreadable') => PhotoReadProblem.unreadable,

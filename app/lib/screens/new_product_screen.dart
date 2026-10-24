@@ -17,8 +17,23 @@ import 'photo_capture_screen.dart';
 /// Adds a product to the catalog, or edits one ([editing]). The name is
 /// typed once — the only text keyboard in the app — or filled from photos
 /// (docs/product-photos.md). Numbers use the keypad. Returns the saved [Product], or null.
+/// Starting values when a product is made from a bill line (docs/stock-from-bill.md D8).
+class BillPrefill {
+  const BillPrefill({this.nameNe, this.nameEn, this.unit, this.costPaisa});
+
+  final String? nameNe;
+  final String? nameEn;
+  final Unit? unit;
+
+  /// Per selling unit, from the bill line.
+  final int? costPaisa;
+}
+
 class NewProductScreen extends StatefulWidget {
-  const NewProductScreen({super.key, this.barcode, this.editing, this.photos});
+  const NewProductScreen({super.key, this.barcode, this.editing, this.photos, this.fromBill});
+
+  /// Made for a bill row: no opening stock here, it arrives with the bill's batch.
+  final BillPrefill? fromBill;
 
   /// Pre-filled when the user scanned a code that isn't in the catalog yet.
   final String? barcode;
@@ -29,10 +44,10 @@ class NewProductScreen extends StatefulWidget {
   /// The product being edited; null when adding a new one.
   final Product? editing;
 
-  static Future<Product?> open(BuildContext context, {String? barcode, PhotoDraft? photos}) =>
+  static Future<Product?> open(BuildContext context, {String? barcode, PhotoDraft? photos, BillPrefill? fromBill}) =>
       Navigator.of(context).push<Product>(
         MaterialPageRoute(
-          builder: (_) => NewProductScreen(barcode: barcode, photos: photos),
+          builder: (_) => NewProductScreen(barcode: barcode, photos: photos, fromBill: fromBill),
         ),
       );
 
@@ -109,6 +124,14 @@ class _NewProductScreenState extends State<NewProductScreen> {
     }
     final photos = widget.photos;
     if (photos != null) _applyPhotos(photos);
+    final bill = widget.fromBill;
+    if (bill != null) {
+      _nameNe.text = bill.nameNe ?? '';
+      _nameEn.text = bill.nameEn ?? '';
+      _unit = bill.unit ?? _unit;
+      final cost = bill.costPaisa ?? 0;
+      if (cost > 0) _cost = formatAmount(cost).replaceAll(',', '');
+    }
   }
 
   /// Fills the form from photos. Never touches price, cost or stock (PR2).
@@ -558,6 +581,12 @@ class _NewProductScreenState extends State<NewProductScreen> {
                                 value: '${formatQty(editing.stockMilli)} ${_unit.ne}',
                                 onTap: () => showToast(context, 'स्टक "स्टक थप्नुस्" बाट थपिन्छ'),
                               )
+                            : widget.fromBill != null
+                            ? PadField(
+                                label: 'अहिले कति छ?',
+                                value: 'बिलबाट थपिन्छ',
+                                onTap: () => showToast(context, 'यो सामानको स्टक बिल सुरक्षित गर्दा थपिन्छ'),
+                              )
                             : PadField(
                                 key: const ValueKey('field-opening'),
                                 label: 'अहिले कति छ?',
@@ -609,7 +638,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
                         set: (v) => _packSize = v,
                       ),
                     ),
-                    if (!_isEdit) ...[
+                    if (!_isEdit && widget.fromBill == null) ...[
                       const SizedBox(height: 10),
                       const Text(
                         'माथिको "अहिले कति छ" र "किनेको मूल्य" कसरी लेख्ने?',

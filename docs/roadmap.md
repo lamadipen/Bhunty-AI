@@ -22,7 +22,7 @@ Gate: ≥ 85 % of voice samples and bill lines parsed correctly; 5-item tap chec
 - [x] Unknown code on Sell offers to add the product; hidden product's code offers to show it again
 - [x] Labels: show-price switch; A4 sheet or thermal 50×30
 - [x] Stock in batches (own cost + sale price each), price history, latest price wins; optional supplier/bill no. — `docs/product-addition.md`
-- [ ] Manual bill (several products in one save) — spec `docs/stock-from-bill.md`
+- [x] Manual bill (several products in one save) — `docs/stock-from-bill.md`
 - [ ] Batch corrections, supplier records
 - [x] Product photos (thumbnails in grid, cart, pickers; add/replace/remove on edit)
 - [ ] Choosing what's on the Sell grid; stock count correction; several codes per product
@@ -39,7 +39,7 @@ Gate: 3 pilot shops use it daily for 2 weeks.
 
 ## Phase 2 — AI assist
 - [ ] Cloud Functions AI wrapper with tool calling + validation
-- [ ] Stock from bill photo (review list with confidence flags, remembered bill names) — spec `docs/stock-from-bill.md`
+- [x] Stock from bill photo (review list with confidence flags, remembered bill names; Claude Haiku via Cloud Function) — `docs/stock-from-bill.md`
 - [ ] Voice entry on Sell, Stock and Udharo screens
 - [ ] Ask Bhunte chat (sales, stock, udharo questions)
 - [x] Add a product from photos: front (thumbnail), barcode, label → AI fills the form (Claude Haiku via Cloud Function) — spec `docs/product-photos.md`

@@ -5,8 +5,9 @@ import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { ClaudeReader } from "./claude";
-import { handleReadPhotos, Quota } from "./handler";
+import { ClaudeBillReader, ClaudeReader } from "./claude";
+import { handleReadBill, handleReadPhotos, Quota } from "./handler";
+import { ReadError } from "./photos";
 import { nepalDayKey } from "./photos";
 
 initializeApp();
@@ -15,14 +16,14 @@ const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
 
 /** Daily reads per shop in shops/{uid}/aiUsage/{yyyy-mm-dd} (Nepal day). Server-side transaction. */
 const firestoreQuota: Quota = {
-  async take(shopId, limit) {
+  async take(shopId, counter, limit) {
     const db = getFirestore();
     const ref = db.doc(`shops/${shopId}/aiUsage/${nepalDayKey(new Date())}`);
     return db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
-      const used = (snap.get("photoReads") as number | undefined) ?? 0;
+      const used = (snap.get(counter) as number | undefined) ?? 0;
       if (used >= limit) return null;
-      tx.set(ref, { photoReads: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      tx.set(ref, { [counter]: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       return used + 1;
     });
   },
@@ -36,17 +37,34 @@ export const readProductPhotos = onCall(
       quota: firestoreQuota,
     });
     if (outcome.ok) return { ...outcome.result, usage: outcome.usage };
-    switch (outcome.error) {
-      case "unauthenticated":
-        throw new HttpsError("unauthenticated", "Sign in first");
-      case "invalid-argument":
-        throw new HttpsError("invalid-argument", "1-3 JPEG images, each under 400 KB");
-      case "limit-reached":
-        throw new HttpsError("resource-exhausted", "limit-reached");
-      case "unreadable":
-        throw new HttpsError("failed-precondition", "unreadable");
-      default:
-        throw new HttpsError("unavailable", "ai-unavailable");
-    }
+    throw toHttpsError(outcome.error);
   },
 );
+
+export const readBill = onCall(
+  { secrets: [anthropicKey], region: "asia-south1", memory: "512MiB", timeoutSeconds: 120, maxInstances: 20 },
+  async (request) => {
+    const outcome = await handleReadBill(request.auth ?? undefined, request.data, {
+      model: new ClaudeBillReader(new Anthropic({ apiKey: anthropicKey.value() })),
+      quota: firestoreQuota,
+    });
+    if (outcome.ok) return { ...outcome.result, usage: outcome.usage };
+    throw toHttpsError(outcome.error);
+  },
+);
+
+/** The app reads the reason from the message (app/lib/photos/cloud_photo_reader.dart). */
+function toHttpsError(error: ReadError): HttpsError {
+  switch (error) {
+    case "unauthenticated":
+      return new HttpsError("unauthenticated", "Sign in first");
+    case "invalid-argument":
+      return new HttpsError("invalid-argument", "Too many or too large images");
+    case "limit-reached":
+      return new HttpsError("resource-exhausted", "limit-reached");
+    case "unreadable":
+      return new HttpsError("failed-precondition", "unreadable");
+    default:
+      return new HttpsError("unavailable", "ai-unavailable");
+  }
+}

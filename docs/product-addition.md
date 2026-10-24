@@ -287,6 +287,6 @@ Done in the first version:
 7. Security rules for the new collections, with emulator tests.
 
 Still planned:
-- A "manual bill" screen to receive several products in one save by hand (S-10) — spec: [stock-from-bill.md](stock-from-bill.md).
+- ~~A "manual bill" screen~~ — done: [stock-from-bill.md](stock-from-bill.md) (S-10 now works by hand too).
 - Correction entries (S-12), supplier records, server-side "latest price wins" across offline phones (P-6).
 - Purchase reports and profit, built from `batches` and `priceChanges`.

@@ -26,9 +26,16 @@ class StockArrival {
 /// with its cost and the sale price from now on (pre-filled with the current
 /// price). Returns a [StockArrival], or null.
 class AddStockSheet extends StatefulWidget {
-  const AddStockSheet({super.key, required this.product});
+  const AddStockSheet({super.key, required this.product, this.initial, this.forBill = false});
 
   final Product product;
+
+  /// Values to start from (editing a bill row).
+  final StockLine? initial;
+
+  /// A line of a bill: nothing is saved here, the bill screen saves them all
+  /// together (docs/stock-from-bill.md); no supplier field.
+  final bool forBill;
 
   @override
   State<AddStockSheet> createState() => _AddStockSheetState();
@@ -39,11 +46,24 @@ class _AddStockSheetState extends State<AddStockSheet> {
   late Product p = widget.product;
 
   // Bills are usually in packs, so start there when the product has one.
-  late bool _inPacks = p.hasPack;
-  String _qty = '';
-  late String _cost = _costTextFor(_inPacks);
-  late String _price = _moneyText(p.pricePaisa);
+  late bool _inPacks = widget.initial == null ? p.hasPack : (widget.initial!.packsMilli != null && p.hasPack);
+  late String _qty = widget.initial == null ? '' : _initialQty();
+  late String _cost = widget.initial == null ? _costTextFor(_inPacks) : _initialCost();
+  late String _price = _moneyText(widget.initial?.salePricePaisa ?? p.pricePaisa);
   DeliveryInfo _info = const DeliveryInfo();
+
+  String _initialQty() {
+    final l = widget.initial!;
+    final q = _inPacks ? l.packsMilli! : l.qtyMilli;
+    return q == 0 ? '' : formatQty(q);
+  }
+
+  /// Rate per entered unit (pack or selling unit), from the line's exact total.
+  String _initialCost() {
+    final l = widget.initial!;
+    final rate = _inPacks ? unitCostFromPack(l.totalCostPaisa, l.packsMilli!) : l.costPaisa;
+    return _moneyText(rate);
+  }
 
   static String _moneyText(int paisa) => paisa == 0 ? '' : formatAmount(paisa).replaceAll(',', '');
 
@@ -260,9 +280,11 @@ class _AddStockSheetState extends State<AddStockSheet> {
             'किनेको मूल्य छैन — पछि हिसाबमा "मूल्य छुटेको" देखिन्छ',
             style: TextStyle(fontSize: 14, color: BColors.warnInk, fontWeight: FontWeight.w700),
           ),
-        DeliveryInfoButton(info: _info, onChanged: (v) => setState(() => _info = v)),
+        if (!widget.forBill) DeliveryInfoButton(info: _info, onChanged: (v) => setState(() => _info = v)),
+        if (widget.forBill) const SizedBox(height: 10),
         BigButton(
-          label: 'स्टकमा थप्नुस्',
+          key: const ValueKey('stock-save'),
+          label: widget.forBill ? (widget.initial == null ? 'बिलमा थप्नुस्' : 'ठीक छ') : 'स्टकमा थप्नुस्',
           trailingIcon: Icons.check_rounded,
           color: hasQty ? BColors.green : BColors.disabled,
           onPressed: hasQty ? _save : null,

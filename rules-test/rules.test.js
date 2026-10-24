@@ -165,3 +165,26 @@ describe('product photos (docs/product-photos.md)', () => {
     await assertFails(deleteDoc(doc(ownerDb(), `shops/${OWNER}/aiUsage/2026-10-24`)));
   });
 });
+
+describe('bills (docs/stock-from-bill.md)', () => {
+  it('the bill save writes delivery fields, batch text and remembered names in one batch', async () => {
+    const db = ownerDb();
+    const now = new Date();
+    const b = writeBatch(db);
+    b.set(doc(db, `shops/${OWNER}/deliveries/d9`), { source: 'bill_photo', totalCostPaisa: 78000, billDateText: '२०८१/०७/०८', billTotalPaisa: 78000, vatPaisa: null, discountPaisa: null, createdAt: now, createdBy: OWNER });
+    b.set(doc(db, `shops/${OWNER}/batches/b9`), { deliveryId: 'd9', productId: 'egg', qtyMilli: 60000, unitCostPaisa: 1300, totalCostPaisa: 78000, salePricePaisa: 2000, billLineText: 'EGGS (TRAY)', createdAt: now, createdBy: OWNER });
+    b.set(doc(db, `shops/${OWNER}/billAliases/eggs%20tray`), { text: 'eggs tray', productId: 'egg', updatedAt: serverTimestamp(), updatedBy: OWNER });
+    b.update(doc(db, `shops/${OWNER}/products/egg`), { stockMilli: increment(60000), costPaisa: 1300 });
+    await assertSucceeds(b.commit());
+    await assertSucceeds(getDoc(doc(db, `shops/${OWNER}/billAliases/eggs%20tray`)));
+  });
+
+  it('bad or foreign remembered names are refused', async () => {
+    const ok = { text: 'eggs tray', productId: 'egg', updatedBy: OWNER };
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/billAliases/x`), { ...ok, text: 'x'.repeat(121) }));
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/billAliases/x`), { ...ok, productId: 5 }));
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/billAliases/x`), { ...ok, updatedBy: OTHER }));
+    await assertFails(setDoc(doc(otherDb(), `shops/${OWNER}/billAliases/x`), { ...ok, updatedBy: OTHER }));
+    await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/aiUsage/2026-10-24`), { billReads: 0 }));
+  });
+});

@@ -105,6 +105,14 @@ class FirestoreBackend implements ShopBackend {
     for (final b in c.batches) {
       batch.set(shop.collection('batches').doc(b.id), batchToMap(b, createdBy: uid));
     }
+    c.billAliases.forEach((text, productId) {
+      batch.set(shop.collection('billAliases').doc(billAliasId(text)), {
+        'text': text,
+        'productId': productId,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedBy': uid,
+      });
+    });
     for (final pc in c.priceChanges) {
       batch.set(shop.collection('priceChanges').doc(pc.id), priceChangeToMap(pc, createdBy: uid));
     }
@@ -139,6 +147,17 @@ class FirestoreBackend implements ShopBackend {
         store.replaceFromRemote(products: [for (final d in docs) productFromMap(d.id, d.data())]);
         done(products);
       }, onError: (Object e) => fail(products, e)),
+    );
+    // Remembered bill names: small, and only needed on the bill screen.
+    _subs.add(
+      shop.collection('billAliases').snapshots().listen((q) {
+        store.replaceFromRemote(
+          billAliases: {
+            for (final d in q.docs)
+              if (d.data() case {'text': final String text, 'productId': final String id}) text: id,
+          },
+        );
+      }, onError: (Object e) => debugPrint('Bhunte: bill names: $e')),
     );
     // Thumbnails don't hold up opening the shop: tiles show letters until they arrive.
     _subs.add(

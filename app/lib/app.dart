@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ai/assistant_service.dart';
 import 'app_scope.dart';
+import 'bills/bill_reader.dart';
 import 'data/shop_store.dart';
 import 'photos/photo_reader.dart';
 import 'photos/photo_source.dart';
@@ -54,6 +55,7 @@ class BhunteApp extends StatelessWidget {
     required this.scanner,
     this.photoReader = const NoPhotoReader(),
     this.photoSource = const DevicePhotoSource(),
+    this.billReader = const NoBillReader(),
     this.signOut,
   });
 
@@ -62,6 +64,7 @@ class BhunteApp extends StatelessWidget {
   final BarcodeScanner scanner;
   final PhotoReader photoReader;
   final PhotoSource photoSource;
+  final BillReader billReader;
 
   /// Set when signed in with Firebase; null in the demo.
   final Future<void> Function()? signOut;
@@ -74,6 +77,7 @@ class BhunteApp extends StatelessWidget {
       scanner: scanner,
       photoReader: photoReader,
       photoSource: photoSource,
+      billReader: billReader,
       signOut: signOut,
       child: MaterialApp(
         title: 'Bhunte AI',

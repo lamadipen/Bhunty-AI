@@ -136,6 +136,10 @@ Map<String, Object?> deliveryToMap(Delivery d, {required String createdBy}) => {
   'supplierName': d.supplierName,
   'supplierPhone': d.supplierPhone,
   'billNo': d.billNo,
+  'billDateText': d.billDateText,
+  'billTotalPaisa': d.billTotalPaisa,
+  'vatPaisa': d.vatPaisa,
+  'discountPaisa': d.discountPaisa,
   'totalCostPaisa': d.totalCostPaisa,
   'batchCount': d.batchCount,
   'createdAt': Timestamp.fromDate(d.createdAt),
@@ -156,9 +160,14 @@ Map<String, Object?> batchToMap(Batch b, {required String createdBy}) => {
   'salePricePaisa': b.salePricePaisa,
   'costMissing': b.costMissing,
   'source': b.source.wire,
+  'billLineText': b.billLineText,
   'createdAt': Timestamp.fromDate(b.createdAt),
   'createdBy': createdBy,
 };
+
+/// `billAliases/{id}`: a bill line's normalised text → the product it is (BR9).
+/// The id is the text itself, URI-encoded, so every device writes the same doc.
+String billAliasId(String normalisedText) => Uri.encodeComponent(normalisedText);
 
 Map<String, Object?> priceChangeToMap(PriceChange c, {required String createdBy}) => {
   'productId': c.productId,

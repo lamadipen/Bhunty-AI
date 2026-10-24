@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'ai/assistant_service.dart';
+import 'bills/bill_reader.dart';
 import 'data/shop_store.dart';
 import 'photos/photo_reader.dart';
 import 'photos/photo_source.dart';
@@ -15,6 +16,7 @@ class AppScope extends InheritedNotifier<ShopStore> {
     required this.scanner,
     this.photoReader = const NoPhotoReader(),
     this.photoSource = const DevicePhotoSource(),
+    this.billReader = const NoBillReader(),
     this.signOut,
     required super.child,
   }) : super(notifier: store);
@@ -23,6 +25,7 @@ class AppScope extends InheritedNotifier<ShopStore> {
   final BarcodeScanner scanner;
   final PhotoReader photoReader;
   final PhotoSource photoSource;
+  final BillReader billReader;
   final Future<void> Function()? signOut;
 
   static AppScope _of(BuildContext context, {required bool listen}) {
@@ -45,6 +48,7 @@ extension AppScopeContext on BuildContext {
   BarcodeScanner get scanner => AppScope._of(this, listen: false).scanner;
   PhotoReader get photoReader => AppScope._of(this, listen: false).photoReader;
   PhotoSource get photoSource => AppScope._of(this, listen: false).photoSource;
+  BillReader get billReader => AppScope._of(this, listen: false).billReader;
 
   /// Null in the demo (nobody is signed in).
   Future<void> Function()? get signOut => AppScope._of(this, listen: false).signOut;

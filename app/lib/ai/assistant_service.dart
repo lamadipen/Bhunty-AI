@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart' show BuildContext;
 
-import '../data/models.dart';
 import '../data/proposed_action.dart';
 
 /// Where the user pressed the mic. The backend uses it to narrow which tools
@@ -38,7 +37,7 @@ class Heard {
   final AssistantIntent intent;
 }
 
-/// Client side of the Cloud Functions AI wrapper (parseVoice, parseBill, askBhunte).
+/// Client side of the Cloud Functions AI wrapper (parseVoice, askBhunte). Bills: `bills/bill_reader.dart`.
 /// Implementations must degrade gracefully offline (principle 7).
 abstract interface class AssistantService {
   /// Records speech, transcribes it and parses it into an intent.
@@ -46,9 +45,6 @@ abstract interface class AssistantService {
 
   /// Records a customer's name for a new udharo account.
   Future<String> listenForName();
-
-  /// Photographs a wholesaler bill and reads its lines.
-  Future<List<BillLineProposal>> readBill();
 }
 
 /// Barcode/QR scanning. The real one opens the camera screen, so it needs a context.

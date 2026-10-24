@@ -40,6 +40,7 @@ Gate: 3 pilot shops use it daily for 2 weeks.
 - [ ] Stock from bill photo (review list with confidence flags)
 - [ ] Voice entry on Sell, Stock and Udharo screens
 - [ ] Ask Bhunte chat (sales, stock, udharo questions)
+- [ ] Add a product from photos: front (thumbnail), barcode, label → AI fills the form (Claude Haiku via Cloud Function) — spec `docs/product-photos.md` (in review)
 - [ ] Product photo matching against the shop's own catalog
 
 ## Phase 3 — Polish & growth

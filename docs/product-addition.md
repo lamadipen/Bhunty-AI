@@ -1,6 +1,6 @@
 # Product addition — spec and test scenarios
 
-Status: **draft for review** (2026-10-19). Nothing in "Planned changes" is implemented yet.
+Status: **implemented (first version)**, 2026-10-19. Tests named by scenario ID: `app/test/batches_test.dart` (plus `product_complete_test.dart`, `labels_test.dart`, `rules-test/`). What is still planned is listed in §6.
 Scope: adding products, receiving stock in **batches**, and the **sale price** rule.
 Out of scope for now: profit, cost averaging, purchase reports (they will be built from the data recorded here).
 
@@ -55,7 +55,7 @@ products/{productId}
   name_ne, name_en, unit, packName?, packSizeMilli?
   pricePaisa            # current sale price  = newPrice of latest priceChanges (cache)
   priceSetAt            # createdAt of that price change (for R6)
-  lastCostPaisa         # unit cost of the latest batch (reference, R9)
+  costPaisa             # unit cost of the latest batch (reference, R9)
   stockMilli            # cache; changed only by FieldValue.increment
   lowStockAtMilli, barcode?, ownCode, labelKind?, archived, isFavourite
   sortOrder, createdAt
@@ -222,6 +222,7 @@ All start from: **वाइवाइ — stock 10, lastCost ₹10, price ₹15**
 **S-10 Two products in one save**
 - When: on the same screen, receive वाइवाइ 10 @ ₹13 (price ₹18) and अण्डा 30 @ ₹16 (price kept).
 - Then: 1 delivery, 2 batches, 1 priceChange (वाइवाइ).
+- First version: works for bill-photo saves and in the data layer; by hand, the Stock screen saves one product per entry (a "manual bill" screen for several products is planned).
 
 **S-11 Quantity zero / no cost**
 - When: qty 0 → save is disabled. Cost blank → batch saved with cost ₹0 and marked "cost missing" (shows in reports for follow-up).
@@ -274,13 +275,18 @@ All start from: **वाइवाइ — stock 10, lastCost ₹10, price ₹15**
 
 ---
 
-## 6. Planned changes (from today's app)
+## 6. Status
 
-1. Replace `stockEntries` with `deliveries` + `batches`; add `priceChanges`.
-2. Add-stock sheet: a **sale price** field, pre-filled with the current price (S-1…S-5).
-3. Bill-photo review: sale price per line, pre-filled (S-6).
-4. Product creation writes the `initial` price change; edit writes `manual` (A-3, P-1, P-3).
-5. Product keeps `lastCostPaisa` and `priceSetAt`; drop "latest cost overwrites cost" wording.
-6. Optional supplier name/phone and bill number on a delivery (S-9).
-7. Security rules for the new collections; rules tests.
-8. Later: correction entries (S-12), supplier records, server-side "latest price wins" (P-6), purchase reports, profit.
+Done in the first version:
+1. `deliveries` + `batches` + `priceChanges` replace `stockEntries` (old `stockEntries` stay readable, no new writes).
+2. Add-stock sheet: **sale price** field pre-filled with the current price, change note, cost-missing note (S-1…S-5, S-11).
+3. Bill-photo review: sale price per line, pre-filled; optional supplier/bill (S-6, S-9).
+4. Product creation writes the `initial` price change (linked to the opening batch); edit writes `manual` only when the price changes (A-3, P-1, P-3).
+5. Product keeps `costPaisa` (latest batch's unit cost) and `priceSetAt`.
+6. Opening stock and its cost can be entered in packs on the new-product form (A-4).
+7. Security rules for the new collections, with emulator tests.
+
+Still planned:
+- A "manual bill" screen to receive several products in one save by hand (S-10).
+- Correction entries (S-12), supplier records, server-side "latest price wins" across offline phones (P-6).
+- Purchase reports and profit, built from `batches` and `priceChanges`.

@@ -103,7 +103,10 @@ void main() {
       expect(changes, hasLength(1), reason: 'one action, one batch');
       expect(changes.single.newProducts.single.stockMilli, 0);
       expect(changes.single.stockDeltas[p.id], 10 * milli);
-      expect(changes.single.stockEntry!.totalPaisa, rs(200));
+      expect(changes.single.delivery!.totalCostPaisa, rs(200));
+      expect(changes.single.delivery!.source, StockSource.opening);
+      expect(changes.single.batches.single.salePricePaisa, rs(25));
+      expect(changes.single.priceChanges.single.reason, PriceReason.initial);
     });
 
     test('adding stock records the newest cost price', () {

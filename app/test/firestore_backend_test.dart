@@ -87,9 +87,12 @@ void main() {
     await pumpEventQueue();
 
     expect((await doc('products/waiwai'))['stockMilli'], 66 * milli);
-    final entries = await db.collection('shops/$uid/stockEntries').get();
-    expect(entries.docs.single['source'], 'bill_photo');
-    expect(entries.docs.single['totalPaisa'], rs(18 * 60));
+    final deliveries = await db.collection('shops/$uid/deliveries').get();
+    expect(deliveries.docs.single['source'], 'bill_photo');
+    expect(deliveries.docs.single['totalCostPaisa'], rs(18 * 60));
+    final batches = await db.collection('shops/$uid/batches').get();
+    expect(batches.docs.single['salePricePaisa'], rs(25), reason: 'current price kept');
+    expect((await db.collection('shops/$uid/stockEntries').get()).docs, isEmpty);
   });
 
   test('changes from another device reach the store', () async {

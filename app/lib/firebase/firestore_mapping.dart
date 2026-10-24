@@ -27,6 +27,7 @@ Map<String, Object?> productToMap(Product p) => {
   'labelKind': p.labelKind?.name,
   'ownCode': p.ownCode,
   'archived': p.archived,
+  'priceSetAt': p.priceSetAt == null ? null : Timestamp.fromDate(p.priceSetAt!),
 };
 
 Product productFromMap(String id, Map<String, dynamic> m) => Product(
@@ -49,6 +50,7 @@ Product productFromMap(String id, Map<String, dynamic> m) => Product(
   // Older docs: only own codes ever had a labelKind.
   ownCode: m['ownCode'] as bool? ?? m['labelKind'] != null,
   archived: m['archived'] as bool? ?? false,
+  priceSetAt: (m['priceSetAt'] as Timestamp?)?.toDate(),
 );
 
 Map<String, Object?> customerToMap(Customer c) => {
@@ -127,14 +129,42 @@ Sale saleFromMap(String id, Map<String, dynamic> m) {
   );
 }
 
-Map<String, Object?> stockEntryToMap(StockEntry e, {required String createdBy}) => {
-  'source': e.source.wire,
-  'lines': [
-    for (final l in e.lines)
-      {'productId': l.productId, 'qtyMilli': l.qtyMilli, 'costPaisa': l.costPaisa, 'totalCostPaisa': l.totalCostPaisa},
-  ],
-  'totalPaisa': e.totalPaisa,
-  'createdAt': Timestamp.fromDate(e.createdAt),
+Map<String, Object?> deliveryToMap(Delivery d, {required String createdBy}) => {
+  'source': d.source.wire,
+  'supplierName': d.supplierName,
+  'supplierPhone': d.supplierPhone,
+  'billNo': d.billNo,
+  'totalCostPaisa': d.totalCostPaisa,
+  'batchCount': d.batchCount,
+  'createdAt': Timestamp.fromDate(d.createdAt),
+  'createdBy': createdBy,
+};
+
+Map<String, Object?> batchToMap(Batch b, {required String createdBy}) => {
+  'deliveryId': b.deliveryId,
+  'productId': b.productId,
+  'productName': b.productName,
+  'qtyMilli': b.qtyMilli,
+  'enteredAs': b.enteredAsPack ? 'pack' : 'unit',
+  'packName': b.packName,
+  'packSizeMilli': b.packSizeMilli,
+  'packsMilli': b.packsMilli,
+  'unitCostPaisa': b.unitCostPaisa,
+  'totalCostPaisa': b.totalCostPaisa,
+  'salePricePaisa': b.salePricePaisa,
+  'costMissing': b.costMissing,
+  'source': b.source.wire,
+  'createdAt': Timestamp.fromDate(b.createdAt),
+  'createdBy': createdBy,
+};
+
+Map<String, Object?> priceChangeToMap(PriceChange c, {required String createdBy}) => {
+  'productId': c.productId,
+  'oldPricePaisa': c.oldPricePaisa,
+  'newPricePaisa': c.newPricePaisa,
+  'reason': c.reason.name,
+  'batchId': c.batchId,
+  'createdAt': Timestamp.fromDate(c.createdAt),
   'createdBy': createdBy,
 };
 

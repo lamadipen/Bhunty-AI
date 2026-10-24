@@ -7,11 +7,44 @@ import 'package:printing/printing.dart';
 
 import '../app_scope.dart';
 import '../core/barcode.dart';
+import '../core/money.dart';
+import '../data/models.dart';
 import '../labels/label_pdf.dart';
 import '../labels/product_label.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/number_pad.dart';
+
+/// After a price change on an own-code product: printed labels show the old
+/// price, so offer fresh ones (scanning always gives the new price).
+Future<void> offerReprint(BuildContext context, Product p, int oldPricePaisa) async {
+  final yes = await showBhunteSheet<bool>(
+    context,
+    (c) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('नयाँ लेबल छाप्ने?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        Text(
+          'पुराना लेबलमा ${formatRs(oldPricePaisa)} लेखिएको छ। स्क्यान गर्दा ${formatRs(p.pricePaisa)} नै आउँछ।',
+          style: const TextStyle(fontSize: 16, color: BColors.inkSoft, height: 1.35),
+        ),
+        const SizedBox(height: 16),
+        BigButton(label: 'नयाँ लेबल छाप्नुस्', onPressed: () => Navigator.pop(c, true)),
+        const SizedBox(height: 8),
+        BigButton(
+          label: 'पछि',
+          outlineColor: BColors.line,
+          foreground: BColors.ink,
+          height: 56,
+          fontSize: 18,
+          onPressed: () => Navigator.pop(c, false),
+        ),
+      ],
+    ),
+  );
+  if (yes == true && context.mounted) await Navigator.of(context).push(LabelScreen.route<void>(p.id));
+}
 
 /// Print the shop's own barcode/QR stickers for one product.
 class LabelScreen extends StatefulWidget {

@@ -58,9 +58,46 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // Older stock records (before deliveries/batches); read-only now.
       match /stockEntries/{entryId} {
         allow read: if isOwner(shopId);
-        allow create: if isOwner(shopId) && incoming().totalPaisa is int;
+        allow write: if false;
+      }
+
+      // One bill / one save. Supplier and bill number are optional.
+      match /deliveries/{deliveryId} {
+        allow read: if isOwner(shopId);
+        allow create: if isOwner(shopId)
+          && incoming().source in ['opening', 'manual', 'bill_photo', 'product_photo', 'voice']
+          && incoming().totalCostPaisa is int
+          && incoming().totalCostPaisa >= 0
+          && incoming().createdBy == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      // One product in one delivery, with its own cost and sale price. Append-only.
+      match /batches/{batchId} {
+        allow read: if isOwner(shopId);
+        allow create: if isOwner(shopId)
+          && incoming().qtyMilli is int
+          && incoming().qtyMilli > 0
+          && incoming().unitCostPaisa is int
+          && incoming().totalCostPaisa is int
+          && incoming().totalCostPaisa >= 0
+          && incoming().salePricePaisa is int
+          && incoming().salePricePaisa > 0
+          && incoming().createdBy == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      // Price history: initial, stock or manual. Append-only.
+      match /priceChanges/{changeId} {
+        allow read: if isOwner(shopId);
+        allow create: if isOwner(shopId)
+          && incoming().reason in ['initial', 'stock', 'manual']
+          && incoming().newPricePaisa is int
+          && incoming().newPricePaisa > 0
+          && incoming().createdBy == request.auth.uid;
         allow update, delete: if false;
       }
 

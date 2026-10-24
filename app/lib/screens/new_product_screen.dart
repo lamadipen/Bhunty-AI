@@ -42,6 +42,18 @@ class _NewProductScreenState extends State<NewProductScreen> {
   String _price = '';
   String _cost = '';
   String _opening = '';
+
+  /// Opening stock (and its cost) counted in packs, e.g. 2 कार्टुन at रु 540 (A-4).
+  bool _openingInPacks = false;
+  bool get _packsMode => _openingInPacks && _packName != null && parseQtyMilli(_packSize) > milli;
+  String get _costUnitName => _packsMode ? _packName! : _unit.ne;
+
+  /// Cost per selling unit, whichever way it was entered.
+  int get _unitCost {
+    final entered = parseMoneyPaisa(_cost);
+    return _packsMode ? unitCostFromPack(entered, parseQtyMilli(_packSize)) : entered;
+  }
+
   String _lowAt = '';
   String? _packName;
   String _packSize = '';
@@ -189,8 +201,9 @@ class _NewProductScreenState extends State<NewProductScreen> {
     }
     final store = context.readStore;
     final price = parseMoneyPaisa(_price);
-    final cost = parseMoneyPaisa(_cost);
+    final cost = _unitCost;
     final packSize = _packName == null ? null : parseQtyMilli(_packSize);
+    final openingEntered = parseQtyMilli(_opening);
     final problem = store.validateNewProduct(
       nameNe: _nameNe.text,
       pricePaisa: price,
@@ -209,7 +222,10 @@ class _NewProductScreenState extends State<NewProductScreen> {
       pricePaisa: price,
       costPaisa: cost,
       unit: _unit,
-      openingStockMilli: parseQtyMilli(_opening),
+      openingStockMilli: _packsMode ? packsToUnitsMilli(openingEntered, packSize!) : openingEntered,
+      openingPacksMilli: _packsMode ? openingEntered : null,
+      // Exactly as on the bill: packs × pack price, or units × unit price.
+      openingTotalCostPaisa: lineTotal(parseMoneyPaisa(_cost), openingEntered),
       lowStockAtMilli: _lowAt.isEmpty ? null : parseQtyMilli(_lowAt),
       barcode: _barcode,
       ownCode: _ownCode,
@@ -285,7 +301,7 @@ class _NewProductScreenState extends State<NewProductScreen> {
     final store = context.store;
     final editing = _isEdit ? store.product(widget.editing!.id) : null;
     final unitLocked = editing != null && !store.canChangeUnit(editing);
-    final price = parseMoneyPaisa(_price), cost = parseMoneyPaisa(_cost);
+    final price = parseMoneyPaisa(_price), cost = _unitCost;
     final margin = price - cost;
     return Scaffold(
       body: SafeArea(
@@ -340,10 +356,10 @@ class _NewProductScreenState extends State<NewProductScreen> {
                       Expanded(
                         child: PadField(
                           key: const ValueKey('field-cost'),
-                          label: 'किनेको मूल्य · प्रति ${_unit.ne}',
+                          label: 'किनेको मूल्य · प्रति $_costUnitName',
                           value: _cost.isEmpty ? 'रु —' : formatRs(cost),
                           onTap: () => _pad(
-                            title: 'किनेको मूल्य · प्रति ${_unit.ne}',
+                            title: 'किनेको मूल्य · प्रति $_costUnitName',
                             current: _cost,
                             money: true,
                             set: (v) => _cost = v,
@@ -380,11 +396,11 @@ class _NewProductScreenState extends State<NewProductScreen> {
                             : PadField(
                                 key: const ValueKey('field-opening'),
                                 label: 'अहिले कति छ?',
-                                value: '${_opening.isEmpty ? '0' : _opening} ${_unit.ne}',
+                                value: '${_opening.isEmpty ? '0' : _opening} ${_packsMode ? _packName : _unit.ne}',
                                 onTap: () => _pad(
                                   title: 'अहिले कति छ?',
                                   current: _opening,
-                                  decimal: _unit.isLoose,
+                                  decimal: _unit.isLoose && !_packsMode,
                                   set: (v) => _opening = v,
                                 ),
                               ),
@@ -410,7 +426,10 @@ class _NewProductScreenState extends State<NewProductScreen> {
                     values: [null, ..._packNames],
                     selected: _packName,
                     label: (n) => n ?? 'खुद्रै (${_unit.ne}मा)',
-                    onPick: (n) => setState(() => _packName = n),
+                    onPick: (n) => setState(() {
+                      _packName = n;
+                      if (n == null) _openingInPacks = false;
+                    }),
                   ),
                   if (_packName != null) ...[
                     const SizedBox(height: 8),
@@ -425,6 +444,20 @@ class _NewProductScreenState extends State<NewProductScreen> {
                         set: (v) => _packSize = v,
                       ),
                     ),
+                    if (!_isEdit) ...[
+                      const SizedBox(height: 10),
+                      const Text(
+                        'माथिको "अहिले कति छ" र "किनेको मूल्य" कसरी लेख्ने?',
+                        style: TextStyle(fontSize: 15, color: BColors.inkSoft),
+                      ),
+                      const SizedBox(height: 6),
+                      _choices<bool>(
+                        values: const [false, true],
+                        selected: _openingInPacks,
+                        label: (packs) => packs ? '$_packNameमा' : '${_unit.ne}मा',
+                        onPick: (packs) => setState(() => _openingInPacks = packs),
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 16),
                   _label('बारकोड'),

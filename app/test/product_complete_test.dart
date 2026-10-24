@@ -98,7 +98,7 @@ void main() {
         pricePaisa: rs(700),
         costPaisa: rs(600),
         unit: Unit.kg,
-        barcode: '2100001234569',
+        barcode: '2100001234560',
       );
       expect(p.hasOwnCode, isFalse);
       expect(p.labelKind, isNull);

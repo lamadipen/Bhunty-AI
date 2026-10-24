@@ -82,6 +82,40 @@ describe('the app\'s sale batch', () => {
   });
 });
 
+describe('stock batches and price history', () => {
+  const now = new Date();
+  it('a delivery with a batch and a price change is allowed', async () => {
+    const db = ownerDb();
+    const b = writeBatch(db);
+    b.set(doc(db, `shops/${OWNER}/deliveries/d1`), { source: 'manual', totalCostPaisa: 13000, batchCount: 1, createdAt: now, createdBy: OWNER, supplierName: null, supplierPhone: null, billNo: null });
+    b.set(doc(db, `shops/${OWNER}/batches/b1`), { deliveryId: 'd1', productId: 'egg', qtyMilli: 10000, unitCostPaisa: 1300, totalCostPaisa: 13000, salePricePaisa: 1800, createdAt: now, createdBy: OWNER });
+    b.set(doc(db, `shops/${OWNER}/priceChanges/p1`), { productId: 'egg', oldPricePaisa: 1500, newPricePaisa: 1800, reason: 'stock', batchId: 'b1', createdAt: now, createdBy: OWNER });
+    b.update(doc(db, `shops/${OWNER}/products/egg`), { stockMilli: increment(10000), pricePaisa: 1800 });
+    await assertSucceeds(b.commit());
+  });
+
+  it('bad batches and price changes are refused', async () => {
+    const db = ownerDb();
+    const base = { deliveryId: 'd1', productId: 'egg', qtyMilli: 10000, unitCostPaisa: 1300, totalCostPaisa: 13000, salePricePaisa: 1800, createdAt: now, createdBy: OWNER };
+    await assertFails(setDoc(doc(db, `shops/${OWNER}/batches/b2`), { ...base, qtyMilli: 0 }));
+    await assertFails(setDoc(doc(db, `shops/${OWNER}/batches/b3`), { ...base, salePricePaisa: 0 }));
+    await assertFails(setDoc(doc(db, `shops/${OWNER}/batches/b4`), { ...base, unitCostPaisa: 13.5 }));
+    await assertFails(setDoc(doc(db, `shops/${OWNER}/priceChanges/p2`), { productId: 'egg', newPricePaisa: 1800, reason: 'guess', createdAt: now, createdBy: OWNER }));
+    await assertFails(setDoc(doc(db, `shops/${OWNER}/stockEntries/s1`), { totalPaisa: 1 }));
+  });
+
+  it('history cannot be edited or deleted', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `shops/${OWNER}/batches/old`), { qtyMilli: 1000, salePricePaisa: 1500 });
+      await setDoc(doc(ctx.firestore(), `shops/${OWNER}/priceChanges/old`), { newPricePaisa: 1500, reason: 'initial' });
+    });
+    const db = ownerDb();
+    await assertFails(updateDoc(doc(db, `shops/${OWNER}/batches/old`), { qtyMilli: 2000 }));
+    await assertFails(deleteDoc(doc(db, `shops/${OWNER}/batches/old`)));
+    await assertFails(updateDoc(doc(db, `shops/${OWNER}/priceChanges/old`), { newPricePaisa: 1 }));
+  });
+});
+
 describe('append-only records', () => {
   it('sales and ledger entries cannot be edited or deleted', async () => {
     const db = ownerDb();

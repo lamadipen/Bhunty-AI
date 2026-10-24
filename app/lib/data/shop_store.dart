@@ -40,6 +40,11 @@ class ShopStore extends ChangeNotifier {
   final Map<String, Customer> _customers;
   final List<Sale> _sales;
   final List<LedgerEntry> _ledger = [];
+
+  // Stock and price history recorded on this device (Firestore keeps the full history).
+  final List<Delivery> _deliveries = [];
+  final List<Batch> _batches = [];
+  final List<PriceChange> _priceChanges = [];
   int _seq = 0;
 
   String _newId(String prefix) => _backend?.newId() ?? '$prefix-${_now().microsecondsSinceEpoch}-${++_seq}';
@@ -99,6 +104,11 @@ class ShopStore extends ChangeNotifier {
 
   List<Sale> get sales => List.unmodifiable(_sales);
   List<LedgerEntry> get ledger => List.unmodifiable(_ledger);
+  List<Delivery> get deliveries => List.unmodifiable(_deliveries);
+
+  /// Oldest first.
+  List<Batch> batchesFor(String productId) => _batches.where((b) => b.productId == productId).toList();
+  List<PriceChange> priceHistory(String productId) => _priceChanges.where((c) => c.productId == productId).toList();
 
   int cartTotal(Map<String, int> cart) =>
       cart.entries.fold(0, (sum, e) => sum + lineTotal(product(e.key).pricePaisa, e.value));
@@ -259,33 +269,109 @@ class ShopStore extends ChangeNotifier {
     _commitLedger(_addLedger(customerId, LedgerType.payment, amountPaisa));
   }
 
-  /// Stock arrived. Each product's cost becomes the newest cost paid for it.
-  void addStock(List<StockLine> lines, {StockSource source = StockSource.manual}) {
-    final problem = validate(AddStock(lines: lines));
+  /// Nepali reason these stock lines can't be saved, or null.
+  String? validateStock(List<StockLine> lines) =>
+      validate(AddStock(lines: lines)) ??
+      (lines.any((l) => l.salePricePaisa != null && l.salePricePaisa! <= 0) ? 'बेच्ने मूल्य मिलेन' : null) ??
+      (lines.any((l) => l.totalCostPaisa < 0) ? 'किनेको मूल्य मिलेन' : null);
+
+  /// Stock arrived: one delivery, one batch per line, each with its own cost
+  /// and sale price; a batch at a new price changes the product's price.
+  /// One write (docs/product-addition.md, R2–R3).
+  Delivery addStock(
+    List<StockLine> lines, {
+    StockSource source = StockSource.manual,
+    String? supplierName,
+    String? supplierPhone,
+    String? billNo,
+  }) {
+    final problem = validateStock(lines);
     if (problem != null) throw ArgumentError(problem);
-    _commit(_stockChange(lines, source));
+    final change = _stockChange(
+      lines,
+      source,
+      supplierName: supplierName,
+      supplierPhone: supplierPhone,
+      billNo: billNo,
+    );
+    _commit(change);
+    return change.delivery!;
   }
 
-  ShopChange _stockChange(List<StockLine> lines, StockSource source, {List<Product> newProducts = const []}) {
+  ShopChange _stockChange(
+    List<StockLine> lines,
+    StockSource source, {
+    List<Product> newProducts = const [],
+    List<PriceChange> extraPriceChanges = const [],
+    String? supplierName,
+    String? supplierPhone,
+    String? billNo,
+  }) {
+    final now = _now();
+    final deliveryId = _newId('delivery');
+    String? clean(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
     final deltas = <String, int>{};
     final costs = <String, int>{};
+    final batches = <Batch>[];
+    final prices = <PriceChange>[...extraPriceChanges];
     for (final l in lines) {
       final p = _products[l.productId]!;
-      _products[l.productId] = p.copyWith(stockMilli: p.stockMilli + l.qtyMilli, costPaisa: l.costPaisa);
-      deltas[l.productId] = (deltas[l.productId] ?? 0) + l.qtyMilli;
-      if (l.costPaisa != p.costPaisa) costs[l.productId] = l.costPaisa;
+      final salePrice = l.salePricePaisa ?? p.pricePaisa;
+      final batch = Batch(
+        id: _newId('batch'),
+        deliveryId: deliveryId,
+        productId: p.id,
+        productName: p.nameNe,
+        qtyMilli: l.qtyMilli,
+        packName: l.packsMilli == null ? null : p.packName,
+        packSizeMilli: l.packsMilli == null ? null : p.packSizeMilli,
+        packsMilli: l.packsMilli,
+        unitCostPaisa: l.costPaisa,
+        totalCostPaisa: l.totalCostPaisa,
+        salePricePaisa: salePrice,
+        source: source,
+        createdAt: now,
+      );
+      batches.add(batch);
+      var updated = p.copyWith(stockMilli: p.stockMilli + l.qtyMilli, costPaisa: l.costPaisa);
+      if (salePrice != p.pricePaisa) {
+        prices.add(
+          PriceChange(
+            id: _newId('price'),
+            productId: p.id,
+            oldPricePaisa: p.pricePaisa,
+            newPricePaisa: salePrice,
+            reason: PriceReason.stock,
+            batchId: batch.id,
+            createdAt: now,
+          ),
+        );
+        updated = updated.copyWith(pricePaisa: salePrice, priceSetAt: now);
+      }
+      _products[p.id] = updated;
+      deltas[p.id] = (deltas[p.id] ?? 0) + l.qtyMilli;
+      costs[p.id] = l.costPaisa;
     }
+    final delivery = Delivery(
+      id: deliveryId,
+      source: source,
+      totalCostPaisa: batches.fold(0, (sum, b) => sum + b.totalCostPaisa),
+      batchCount: batches.length,
+      createdAt: now,
+      supplierName: clean(supplierName),
+      supplierPhone: clean(supplierPhone),
+      billNo: clean(billNo),
+    );
+    _deliveries.add(delivery);
+    _batches.addAll(batches);
+    _priceChanges.addAll(prices);
     return ShopChange(
       newProducts: newProducts,
       stockDeltas: deltas,
       costUpdates: costs,
-      stockEntry: StockEntry(
-        id: _newId('stock'),
-        source: source,
-        lines: lines,
-        totalPaisa: lines.fold(0, (sum, l) => sum + l.totalCostPaisa),
-        createdAt: _now(),
-      ),
+      delivery: delivery,
+      batches: batches,
+      priceChanges: prices,
     );
   }
 
@@ -349,8 +435,10 @@ class ShopStore extends ChangeNotifier {
     return null;
   }
 
-  /// Adds a product to the catalog. Opening stock is recorded as a stock entry,
-  /// so every unit of stock is explained by an entry.
+  /// Adds a product to the catalog with its first price change (`initial`).
+  /// Opening stock is its first batch (source `opening`), so every unit of
+  /// stock is explained by a batch. [costPaisa] is per selling unit; with
+  /// [openingPacksMilli] the opening stock was counted in packs.
   Product addProduct({
     required String nameNe,
     String nameEn = '',
@@ -358,6 +446,8 @@ class ShopStore extends ChangeNotifier {
     required int costPaisa,
     required Unit unit,
     int openingStockMilli = 0,
+    int? openingPacksMilli,
+    int? openingTotalCostPaisa,
     int? lowStockAtMilli,
     String? barcode,
     bool ownCode = false,
@@ -395,18 +485,48 @@ class ShopStore extends ChangeNotifier {
       packName: packName,
       packSizeMilli: packName == null ? null : packSizeMilli,
       labelKind: own ? (labelKind ?? LabelKind.barcode) : null,
+      priceSetAt: _now(),
     );
     _products[p.id] = p;
+    PriceChange initial({String? batchId}) => PriceChange(
+      id: _newId('price'),
+      productId: p.id,
+      newPricePaisa: pricePaisa,
+      reason: PriceReason.initial,
+      batchId: batchId,
+      createdAt: p.priceSetAt!,
+    );
     if (openingStockMilli > 0) {
+      final change = _stockChange(
+        [
+          StockLine(
+            productId: p.id,
+            qtyMilli: openingStockMilli,
+            costPaisa: costPaisa,
+            totalCostPaisa: openingTotalCostPaisa,
+            packsMilli: packName == null ? null : openingPacksMilli,
+          ),
+        ],
+        StockSource.opening,
+        newProducts: [p],
+      );
+      // The initial price is linked to the opening batch.
+      final first = initial(batchId: change.batches.single.id);
+      _priceChanges.add(first);
       _commit(
-        _stockChange(
-          [StockLine(productId: p.id, qtyMilli: openingStockMilli, costPaisa: costPaisa)],
-          StockSource.manual,
-          newProducts: [p],
+        ShopChange(
+          newProducts: change.newProducts,
+          stockDeltas: change.stockDeltas,
+          costUpdates: change.costUpdates,
+          delivery: change.delivery,
+          batches: change.batches,
+          priceChanges: [first],
         ),
       );
     } else {
-      _commit(ShopChange(newProducts: [p]));
+      final first = initial();
+      _priceChanges.add(first);
+      _commit(ShopChange(newProducts: [p], priceChanges: [first]));
     }
     return _products[p.id]!;
   }
@@ -462,9 +582,22 @@ class ShopStore extends ChangeNotifier {
       packSizeMilli: packName == null ? null : packSizeMilli,
       labelKind: own ? (labelKind ?? old.labelKind ?? LabelKind.barcode) : null,
       archived: old.archived,
+      priceSetAt: pricePaisa == old.pricePaisa ? old.priceSetAt : _now(),
     );
     _products[id] = p;
-    _commit(ShopChange(updatedProducts: [p]));
+    final changes = <PriceChange>[
+      if (pricePaisa != old.pricePaisa)
+        PriceChange(
+          id: _newId('price'),
+          productId: id,
+          oldPricePaisa: old.pricePaisa,
+          newPricePaisa: pricePaisa,
+          reason: PriceReason.manual,
+          createdAt: p.priceSetAt!,
+        ),
+    ];
+    _priceChanges.addAll(changes);
+    _commit(ShopChange(updatedProducts: [p], priceChanges: changes));
     return p;
   }
 
@@ -494,6 +627,7 @@ class ShopStore extends ChangeNotifier {
       packSizeMilli: old.packSizeMilli,
       labelKind: old.labelKind,
       archived: archived,
+      priceSetAt: old.priceSetAt,
     );
     _products[id] = p;
     _commit(ShopChange(updatedProducts: [p]));

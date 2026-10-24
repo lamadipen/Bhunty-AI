@@ -7,13 +7,23 @@ import '../core/qty.dart';
 import '../data/models.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
+import '../widgets/delivery_info.dart';
 import '../widgets/keypad.dart';
 import '../widgets/number_pad.dart';
 import 'label_screen.dart';
 import 'new_product_screen.dart';
 
-/// "कति आयो?" — stock arriving for one product, in selling units or packs.
-/// Returns the [StockLine] to add (always in selling units), or null.
+/// What the add-stock sheet returns: the line (always in selling units, with
+/// its cost and sale price) and the optional supplier/bill details.
+class StockArrival {
+  const StockArrival(this.line, this.info);
+  final StockLine line;
+  final DeliveryInfo info;
+}
+
+/// "कति आयो?" — stock arriving for one product, in selling units or packs,
+/// with its cost and the sale price from now on (pre-filled with the current
+/// price). Returns a [StockArrival], or null.
 class AddStockSheet extends StatefulWidget {
   const AddStockSheet({super.key, required this.product});
 
@@ -31,6 +41,10 @@ class _AddStockSheetState extends State<AddStockSheet> {
   late bool _inPacks = p.hasPack;
   String _qty = '';
   late String _cost = _costTextFor(_inPacks);
+  late String _price = _moneyText(p.pricePaisa);
+  DeliveryInfo _info = const DeliveryInfo();
+
+  static String _moneyText(int paisa) => paisa == 0 ? '' : formatAmount(paisa).replaceAll(',', '');
 
   /// Default cost text: the product's last cost, per unit or per pack.
   String _costTextFor(bool packs) {
@@ -44,6 +58,8 @@ class _AddStockSheetState extends State<AddStockSheet> {
   int get _costEntered => parseMoneyPaisa(_cost);
   int get _unitCost => _inPacks ? unitCostFromPack(_costEntered, p.packSizeMilli!) : _costEntered;
   int get _total => lineTotal(_costEntered, _enteredMilli);
+  int get _priceEntered => parseMoneyPaisa(_price);
+  bool get _priceChanged => _priceEntered != p.pricePaisa;
 
   void _onKey(String k) => setState(() {
     _qty = applyKey(_qty, k, allowDecimal: !_inPacks && p.unit.isLoose, maxDigits: 5);
@@ -70,11 +86,33 @@ class _AddStockSheetState extends State<AddStockSheet> {
     if (text != null) setState(() => _cost = text);
   }
 
+  Future<void> _editPrice() async {
+    final text = await showNumberPad(
+      context,
+      title: 'बेच्ने मूल्य · प्रति ${p.unit.ne}',
+      initial: _price,
+      allowDecimal: true,
+      maxDecimals: 2,
+      prefix: 'रु ',
+    );
+    if (text != null) setState(() => _price = text);
+  }
+
   void _save() {
-    if (_unitsMilli <= 0) return;
+    if (_unitsMilli <= 0 || _priceEntered <= 0) return;
     Navigator.pop(
       context,
-      StockLine(productId: p.id, qtyMilli: _unitsMilli, costPaisa: _unitCost, totalCostPaisa: _total),
+      StockArrival(
+        StockLine(
+          productId: p.id,
+          qtyMilli: _unitsMilli,
+          costPaisa: _unitCost,
+          totalCostPaisa: _total,
+          salePricePaisa: _priceEntered,
+          packsMilli: _inPacks ? _enteredMilli : null,
+        ),
+        _info,
+      ),
     );
   }
 
@@ -181,6 +219,23 @@ class _AddStockSheetState extends State<AddStockSheet> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        PadField(
+          key: const ValueKey('stock-price'),
+          label: 'बेच्ने मूल्य · प्रति ${p.unit.ne} (अबदेखि)',
+          value: _price.isEmpty ? 'रु —' : formatRs(_priceEntered),
+          active: _priceChanged,
+          onTap: _editPrice,
+        ),
+        if (_priceChanged && _priceEntered > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'मूल्य बदलियो: ${formatRs(p.pricePaisa)} → ${formatRs(_priceEntered)} · पुरानो स्टक पनि नयाँ मूल्यमा बिक्छ',
+              key: const ValueKey('price-change-note'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: BColors.greenDark),
+            ),
+          ),
         const SizedBox(height: 10),
         Keypad(
           keyHeight: 54,
@@ -199,7 +254,12 @@ class _AddStockSheetState extends State<AddStockSheet> {
             '${_inPacks && _costEntered > 0 ? ' · ${formatRs(_unitCost)}/${p.unit.ne}' : ''}',
             style: const TextStyle(fontSize: 15, color: BColors.inkSoft),
           ),
-        const SizedBox(height: 10),
+        if (hasQty && _costEntered == 0)
+          const Text(
+            'किनेको मूल्य छैन — पछि हिसाबमा "मूल्य छुटेको" देखिन्छ',
+            style: TextStyle(fontSize: 14, color: BColors.warnInk, fontWeight: FontWeight.w700),
+          ),
+        DeliveryInfoButton(info: _info, onChanged: (v) => setState(() => _info = v)),
         BigButton(
           label: 'स्टकमा थप्नुस्',
           trailingIcon: Icons.check_rounded,

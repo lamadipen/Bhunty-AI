@@ -32,5 +32,14 @@ String formatAmount(int paisa) {
 /// "रु 4,250"
 String formatRs(int paisa) => 'रु ${formatAmount(paisa)}';
 
+/// Keypad text in rupees ("25", "22.5", "22.50") → paisa. Empty → 0.
+int parseMoneyPaisa(String text) {
+  if (text.isEmpty || text == '.') return 0;
+  final parts = text.split('.');
+  final whole = int.parse(parts[0].isEmpty ? '0' : parts[0]);
+  final frac = '${parts.length > 1 ? parts[1] : ''}00'.substring(0, 2);
+  return whole * 100 + int.parse(frac);
+}
+
 /// Line total for a unit price and a quantity in milli-units, rounded half-up to the paisa.
 int lineTotal(int pricePaisa, int qtyMilli) => (pricePaisa * qtyMilli + 500) ~/ 1000;

@@ -68,6 +68,15 @@ describe('the app\'s sale batch', () => {
     await assertFails(setDoc(doc(db, `shops/${OWNER}/customers/ram/ledger/l3`), { type: 'credit', amountPaisa: 0 }));
   });
 
+  it('new products need a name and int pack size', async () => {
+    const db = ownerDb();
+    const base = { name_ne: 'नुन', pricePaisa: 2500, costPaisa: 2000, stockMilli: 0 };
+    await assertSucceeds(setDoc(doc(db, `shops/${OWNER}/products/salt`), { ...base, packName: null, packSizeMilli: null }));
+    await assertSucceeds(setDoc(doc(db, `shops/${OWNER}/products/salt2`), { ...base, packName: 'बोरा', packSizeMilli: 50000 }));
+    await assertFails(setDoc(doc(db, `shops/${OWNER}/products/salt3`), { ...base, packSizeMilli: 2.5 }));
+    await assertFails(setDoc(doc(db, `shops/${OWNER}/products/salt4`), { ...base, name_ne: '' }));
+  });
+
   it('a sale must name the signed-in user as createdBy', async () => {
     await assertFails(setDoc(doc(ownerDb(), `shops/${OWNER}/sales/s4`), { totalPaisa: 100, createdBy: OTHER }));
   });

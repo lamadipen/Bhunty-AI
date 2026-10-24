@@ -1,8 +1,12 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
+import '../core/barcode.dart';
 import '../core/cash.dart';
 import '../core/money.dart';
 import '../core/nepal_time.dart';
+import '../core/qty.dart';
 import 'models.dart';
 import 'proposed_action.dart';
 import 'shop_backend.dart';
@@ -249,27 +253,125 @@ class ShopStore extends ChangeNotifier {
     _commitLedger(_addLedger(customerId, LedgerType.payment, amountPaisa));
   }
 
+  /// Stock arrived. Each product's cost becomes the newest cost paid for it.
   void addStock(List<StockLine> lines, {StockSource source = StockSource.manual}) {
     final problem = validate(AddStock(lines: lines));
     if (problem != null) throw ArgumentError(problem);
+    _commit(_stockChange(lines, source));
+  }
+
+  ShopChange _stockChange(List<StockLine> lines, StockSource source, {List<Product> newProducts = const []}) {
     final deltas = <String, int>{};
+    final costs = <String, int>{};
     for (final l in lines) {
       final p = _products[l.productId]!;
-      _products[l.productId] = p.withStock(p.stockMilli + l.qtyMilli);
+      _products[l.productId] = p.copyWith(stockMilli: p.stockMilli + l.qtyMilli, costPaisa: l.costPaisa);
       deltas[l.productId] = (deltas[l.productId] ?? 0) + l.qtyMilli;
+      if (l.costPaisa != p.costPaisa) costs[l.productId] = l.costPaisa;
     }
-    _commit(
-      ShopChange(
-        stockDeltas: deltas,
-        stockEntry: StockEntry(
-          id: _newId('stock'),
-          source: source,
-          lines: lines,
-          totalPaisa: lines.fold(0, (sum, l) => sum + lineTotal(l.costPaisa, l.qtyMilli)),
-          createdAt: _now(),
-        ),
+    return ShopChange(
+      newProducts: newProducts,
+      stockDeltas: deltas,
+      costUpdates: costs,
+      stockEntry: StockEntry(
+        id: _newId('stock'),
+        source: source,
+        lines: lines,
+        totalPaisa: lines.fold(0, (sum, l) => sum + l.totalCostPaisa),
+        createdAt: _now(),
       ),
     );
+  }
+
+  /// Remembers whether this product's own label prints as a barcode or a QR code.
+  void setLabelKind(String productId, LabelKind kind) {
+    final p = product(productId);
+    if (!p.hasOwnCode || p.labelKind == kind) return;
+    _products[productId] = p.copyWith(labelKind: kind);
+    _commit(ShopChange(labelKinds: {productId: kind}));
+  }
+
+  /// A new in-store code that no product in this shop uses yet.
+  String newInStoreCode({Random? random}) =>
+      generateInStoreEan13(taken: {for (final p in _products.values) ?p.barcode}, random: random);
+
+  /// Nepali reason a new product can't be added, or null.
+  String? validateNewProduct({
+    required String nameNe,
+    required int pricePaisa,
+    required int costPaisa,
+    String? barcode,
+    String? packName,
+    int? packSizeMilli,
+  }) {
+    final name = nameNe.trim();
+    if (name.isEmpty) return 'सामानको नाम लेख्नुस्';
+    if (_products.values.any((p) => p.nameNe.trim() == name)) return 'यो नामको सामान पहिल्यै छ';
+    if (pricePaisa <= 0) return 'बेच्ने मूल्य लेख्नुस्';
+    if (costPaisa < 0) return 'किनेको मूल्य मिलेन';
+    if (barcode != null && barcode.isNotEmpty && productByBarcode(barcode) != null) {
+      return 'यो बारकोड अर्को सामानमा छ';
+    }
+    if (packName != null && (packSizeMilli ?? 0) <= milli) return 'एक $packNameमा कति छ, लेख्नुस्';
+    return null;
+  }
+
+  /// Adds a product to the catalog. Opening stock is recorded as a stock entry,
+  /// so every unit of stock is explained by an entry.
+  Product addProduct({
+    required String nameNe,
+    String nameEn = '',
+    required int pricePaisa,
+    required int costPaisa,
+    required Unit unit,
+    int openingStockMilli = 0,
+    int? lowStockAtMilli,
+    String? barcode,
+    String? packName,
+    int? packSizeMilli,
+    LabelKind? labelKind,
+  }) {
+    final problem = validateNewProduct(
+      nameNe: nameNe,
+      pricePaisa: pricePaisa,
+      costPaisa: costPaisa,
+      barcode: barcode,
+      packName: packName,
+      packSizeMilli: packSizeMilli,
+    );
+    if (problem != null) throw ArgumentError(problem);
+    final name = nameNe.trim();
+    final look = _tilePalette[_products.length % _tilePalette.length];
+    final p = Product(
+      id: _newId('prod'),
+      nameNe: name,
+      nameEn: nameEn.trim(),
+      pricePaisa: pricePaisa,
+      costPaisa: costPaisa,
+      unit: unit,
+      stockMilli: 0,
+      lowStockAtMilli: lowStockAtMilli ?? 0,
+      letter: String.fromCharCodes(name.runes.take(2)),
+      tileBg: look.$1,
+      tileInk: look.$2,
+      barcode: (barcode == null || barcode.isEmpty) ? null : barcode,
+      packName: packName,
+      packSizeMilli: packName == null ? null : packSizeMilli,
+      labelKind: (barcode != null && isInStoreCode(barcode)) ? (labelKind ?? LabelKind.barcode) : null,
+    );
+    _products[p.id] = p;
+    if (openingStockMilli > 0) {
+      _commit(
+        _stockChange(
+          [StockLine(productId: p.id, qtyMilli: openingStockMilli, costPaisa: costPaisa)],
+          StockSource.manual,
+          newProducts: [p],
+        ),
+      );
+    } else {
+      _commit(ShopChange(newProducts: [p]));
+    }
+    return _products[p.id]!;
   }
 
   Customer addCustomer(String name) {
@@ -317,3 +419,13 @@ class ShopStore extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+/// Tile colours for new products (background, ink), from the design palette.
+const _tilePalette = [
+  (0xFFF6E3B4, 0xFF6B4A00),
+  (0xFFDCE8F5, 0xFF1E3E73),
+  (0xFFE3F0E8, 0xFF14512F),
+  (0xFFF5DDE6, 0xFF7A1F45),
+  (0xFFEAE6F4, 0xFF3E2F73),
+  (0xFFF3E7DA, 0xFF6A3F17),
+];

@@ -48,7 +48,9 @@ cd ../rules-test && npm install && npm test
 |---|---|
 | 1 · Home (गृह) | `lib/screens/home_screen.dart` |
 | 2 · Sell (बेच्नुस्) + payment sheets + done | `lib/screens/sell_screen.dart`, `lib/screens/payment_sheets.dart` |
-| 3 · Add stock from bill photo | `lib/screens/stock_screen.dart` |
+| 3 · Add stock (bill photo, voice, or by hand) | `lib/screens/stock_screen.dart`, `lib/screens/add_stock_sheet.dart` |
+| New product (not in the prototype) | `lib/screens/new_product_screen.dart` |
+| Print own barcode/QR labels | `lib/screens/label_screen.dart`, `lib/labels/` |
 | 4 · Udharo (credit) | `lib/screens/udharo_screen.dart` |
 | 5 · Talk to Bhunte | `lib/screens/assistant_screen.dart` |
 | Reports (हिसाब tile; not in the prototype) | `lib/screens/reports_screen.dart` |
@@ -73,9 +75,13 @@ assets/fonts/  Mukta (bundled so Devanagari works offline; OFL licence included)
 - **Only `ShopStore` changes data.** AI output is an `AssistantIntent`; actions are shown on a confirm card and only `ShopStore.apply()` commits them after a tap. `ShopStore.validate()` runs the same checks the Cloud Function will.
 - **Chat answers are built in code** (`ai/answers.dart`) from store data; the model would only pick the metric.
 - **Today is Nepal time** (UTC+5:45) whatever the device timezone.
+- **Own codes are in-store EAN-13 (prefix 2, GS1 restricted circulation)**, so they never clash with real product barcodes. Each product prints its label as a barcode (phone camera *and* laser scanners) or a QR (small/round items). Labels are drawn by Flutter and placed in the PDF as images, because the `pdf` package can't shape Devanagari (`core/barcode.dart`, `labels/`).
+- **Text keyboard only on the new-product name.** Every number goes through the keypad (`widgets/number_pad.dart`).
 - **No ✓/✕ characters in text** — Mukta has no glyphs for them and there is no offline fallback font. Use `Icons.check_rounded` / `Icons.close_rounded` (e.g. `BigButton(trailingIcon: …)`).
 
 ## Versions
+
+`image` is pinned below 4.11: 4.11.0 needs a newer `archive` than `pdf` 3.12 allows. `pdf` 3.13+/`printing` 5.15+ need Flutter 3.41; drop the pin when upgrading.
 
 Firebase packages are pinned to the `cloud_firestore` 6.x / `firebase_core` 4.x line because `fake_cloud_firestore` (used by the tests) does not support `cloud_firestore` 7 yet. Upgrade together when it does.
 

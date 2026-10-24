@@ -42,13 +42,26 @@ class FirestoreBackend implements ShopBackend {
   @override
   void commit(ShopChange c) {
     final batch = db.batch();
+    // New products first: later writes in this batch may update them.
+    for (final p in c.newProducts) {
+      batch.set(_products.doc(p.id), {
+        ...productToMap(p),
+        // After the seeded catalog, in the order they were added.
+        'sortOrder': DateTime.now().millisecondsSinceEpoch,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
     final sale = c.sale;
     if (sale != null) {
       batch.set(_sales.doc(sale.id), {...saleToMap(sale, createdBy: uid), 'syncedAt': FieldValue.serverTimestamp()});
     }
-    c.stockDeltas.forEach((productId, delta) {
-      batch.update(_products.doc(productId), {'stockMilli': FieldValue.increment(delta)});
-    });
+    final productFields = <String, Map<String, Object?>>{};
+    c.stockDeltas.forEach(
+      (id, delta) => productFields.putIfAbsent(id, () => {})['stockMilli'] = FieldValue.increment(delta),
+    );
+    c.costUpdates.forEach((id, cost) => productFields.putIfAbsent(id, () => {})['costPaisa'] = cost);
+    c.labelKinds.forEach((id, kind) => productFields.putIfAbsent(id, () => {})['labelKind'] = kind.name);
+    productFields.forEach((id, fields) => batch.update(_products.doc(id), fields));
     for (final nc in c.newCustomers) {
       batch.set(_customers.doc(nc.id), {...customerToMap(nc), 'createdAt': FieldValue.serverTimestamp()});
     }

@@ -10,6 +10,7 @@ import '../data/proposed_action.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/keypad.dart';
+import '../widgets/product_tile.dart';
 import 'payment_sheets.dart';
 
 /// Checkout: tap grid → scan → voice (tap first, AI second).
@@ -88,6 +89,11 @@ class _SellScreenState extends State<SellScreen> {
     showToast(context, '${store.product(action.productId).nameNe} × ${formatQty(action.qtyMilli)} थपियो');
   }
 
+  Future<void> _pickAny() async {
+    final p = await showProductPicker(context, title: 'कुन सामान?');
+    if (p != null) _add(p.id, milli);
+  }
+
   Future<void> _openPad(Product p) async {
     final q = await showBhunteSheet<int>(context, (c) => QtyPadSheet(product: p, current: _cart[p.id] ?? 0));
     if (q != null) _setQty(p.id, q);
@@ -142,20 +148,12 @@ class _SellScreenState extends State<SellScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                   child: Column(
                     children: [
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: store.favourites.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          mainAxisExtent: 104,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                        itemBuilder: (c, i) {
-                          final p = store.favourites[i];
-                          return _ProductTile(product: p, qtyMilli: _cart[p.id] ?? 0, onTap: () => _add(p.id, milli));
-                        },
+                      ProductGrid(
+                        products: store.favourites,
+                        maxTiles: 8,
+                        onMore: _pickAny,
+                        tileFor: (p) =>
+                            ProductTile(product: p, badgeMilli: _cart[p.id] ?? 0, onTap: () => _add(p.id, milli)),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -257,73 +255,6 @@ class _SellScreenState extends State<SellScreen> {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.product, required this.qtyMilli, required this.onTap});
-
-  final Product product;
-  final int qtyMilli;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = product;
-    return Semantics(
-      button: true,
-      label: '${p.nameNe} ${p.nameEn}, ${formatRs(p.pricePaisa)}, एउटा थप्नुस्',
-      excludeSemantics: true,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: CardBox(
-              key: ValueKey('tile-${p.id}'),
-              radius: 18,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              onTap: onTap,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  LetterTile(letter: p.letter, bg: Color(p.tileBg), ink: Color(p.tileInk)),
-                  const SizedBox(height: 2),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      p.nameNe,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, height: 1.2),
-                    ),
-                  ),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      p.unit.isLoose ? '${formatRs(p.pricePaisa)}/${p.unit.ne}' : formatRs(p.pricePaisa),
-                      style: const TextStyle(fontSize: 13, color: BColors.inkSoft, height: 1),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (qtyMilli > 0)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Container(
-                constraints: const BoxConstraints(minWidth: 24),
-                height: 24,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: BColors.green, borderRadius: BorderRadius.circular(12)),
-                child: Text(
-                  formatQty(qtyMilli),
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: BColors.white),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

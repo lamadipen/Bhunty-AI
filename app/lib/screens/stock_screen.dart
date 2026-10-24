@@ -9,6 +9,9 @@ import '../data/proposed_action.dart';
 import '../data/shop_backend.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
+import '../widgets/product_tile.dart';
+import 'add_stock_sheet.dart';
+import 'new_product_screen.dart';
 
 enum _Stage { pick, review, saved }
 
@@ -134,32 +137,83 @@ class _StockScreenState extends State<StockScreen> {
   }
 
   Widget _pick() {
+    final store = context.store;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       children: [
         _PickButton(
-          height: 150,
+          height: 112,
           filled: true,
           icon: Icons.receipt_outlined,
           title: 'बिलको फोटो',
           subtitle: 'होलसेलको बिल खिच्नुस् · सबै सामान एकैचोटि',
           onTap: _shootBill,
         ),
-        const SizedBox(height: 14),
-        _PickButton(
-          icon: Icons.photo_camera_outlined,
-          iconColor: BColors.green,
-          title: 'सामानको फोटो',
-          subtitle: 'नयाँ सामान, बारकोड नभएको',
-          onTap: () => showToast(context, 'सामानको फोटो चिन्ने सुविधा चाँडै आउँदैछ'),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _PickButton(
+                height: 84,
+                icon: Icons.mic_none_rounded,
+                iconColor: BColors.orange,
+                title: 'बोलेर',
+                subtitle: '“२० वटा साबुन आयो”',
+                onTap: _voiceAdd,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _PickButton(
+                height: 84,
+                icon: Icons.photo_camera_outlined,
+                iconColor: BColors.green,
+                title: 'सामानको फोटो',
+                subtitle: 'चाँडै आउँदैछ',
+                onTap: () => showToast(context, 'सामानको फोटो चिन्ने सुविधा चाँडै आउँदैछ'),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 14),
-        _PickButton(
-          icon: Icons.mic_none_rounded,
-          iconColor: BColors.orange,
-          title: 'बोलेर थप्नुस्',
-          subtitle: '“२० वटा साबुन आयो”',
-          onTap: _voiceAdd,
+        const SizedBox(height: 20),
+        const Text('हातैले थप्नुस्', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        const Text('सामान थिच्नुस्, कति आयो लेख्नुस्', style: TextStyle(fontSize: 15, color: BColors.inkSoft)),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: BigButton(
+                label: 'स्क्यान',
+                icon: Icons.qr_code_scanner_rounded,
+                outlineColor: BColors.green,
+                foreground: BColors.green,
+                height: 60,
+                fontSize: 19,
+                onPressed: _scanForStock,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: BigButton(
+                label: 'नयाँ सामान',
+                icon: Icons.add_rounded,
+                height: 60,
+                fontSize: 19,
+                onPressed: _newProduct,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ProductGrid(
+          products: store.products,
+          tileFor: (p) => ProductTile(
+            product: p,
+            caption: stockLabel(p),
+            warn: p.isLow,
+            action: 'स्टक थप्नुस्',
+            onTap: () => _addManually(p),
+          ),
         ),
         const SizedBox(height: 14),
         const CardBox(
@@ -181,6 +235,28 @@ class _StockScreenState extends State<StockScreen> {
       ],
     );
   }
+
+  Future<void> _addManually(Product p) async {
+    final line = await showBhunteSheet<StockLine>(context, (c) => AddStockSheet(product: p));
+    if (line == null || !mounted) return;
+    context.readStore.addStock([line], source: StockSource.manual);
+    showToast(context, '${p.nameNe} + ${formatQty(line.qtyMilli)} ${p.unit.ne} स्टकमा थपियो');
+  }
+
+  Future<void> _scanForStock() async {
+    final store = context.readStore;
+    final code = await context.scanner.scan();
+    if (code == null || !mounted) return;
+    final p = store.productByBarcode(code);
+    if (p != null) {
+      await _addManually(p);
+    } else {
+      showToast(context, 'नयाँ बारकोड · सामानको विवरण भर्नुस्');
+      await NewProductScreen.open(context, barcode: code);
+    }
+  }
+
+  Future<void> _newProduct() => NewProductScreen.open(context);
 
   Widget _review() {
     final store = context.readStore;
@@ -339,46 +415,56 @@ class _PickButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = filled ? BColors.white : BColors.ink;
+    final sub = filled ? const Color(0xEBFFFFFF) : BColors.inkSoft;
+    final texts = [
+      Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: filled ? 26 : 19, fontWeight: FontWeight.w800, color: fg, height: 1.15),
+      ),
+      Text(
+        subtitle,
+        maxLines: filled ? 2 : 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: filled ? 16 : 13, color: sub, height: 1.25),
+      ),
+    ];
     return Semantics(
       button: true,
+      label: '$title · $subtitle',
+      excludeSemantics: true,
       child: CardBox(
         color: filled ? BColors.green : BColors.white,
         borderColor: filled ? BColors.green : BColors.line,
-        radius: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 22),
+        radius: filled ? 24 : 20,
+        padding: EdgeInsets.symmetric(horizontal: filled ? 22 : 14, vertical: filled ? 0 : 10),
         onTap: onTap,
         child: SizedBox(
-          height: height,
-          child: Row(
-            children: [
-              Icon(icon, size: filled ? 52 : 44, color: filled ? BColors.white : iconColor),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          height: filled ? height : height - 20,
+          child: filled
+              ? Row(
                   children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: filled ? 26 : 22,
-                        fontWeight: FontWeight.w800,
-                        color: fg,
-                        height: 1.15,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: filled ? 16 : 15,
-                        color: filled ? const Color(0xEBFFFFFF) : BColors.inkSoft,
+                    Icon(icon, size: 48, color: BColors.white),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: texts,
                       ),
                     ),
                   ],
+                )
+              // Small cards sit two to a row: icon on top, text below.
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Icon(icon, size: 26, color: iconColor),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: texts),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -19,6 +19,14 @@ enum Unit {
   bool get isLoose => this == kg || this == litre;
 }
 
+/// Packs to selling units: 2 cartons (2000) of 30 packets (30000) → 60000.
+int packsToUnitsMilli(int packsMilli, int packSizeMilli) => (packsMilli * packSizeMilli + 500) ~/ milli;
+
+/// Cost of one selling unit from a pack price, rounded to the paisa:
+/// रु 900 a carton of 30 → रु 30 a packet.
+int unitCostFromPack(int packCostPaisa, int packSizeMilli) =>
+    (packCostPaisa * milli + packSizeMilli ~/ 2) ~/ packSizeMilli;
+
 /// 2000 → "2", 2500 → "2.5", 250 → "0.25".
 String formatQty(int qtyMilli) {
   final sign = qtyMilli < 0 ? '-' : '';

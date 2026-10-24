@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/barcode.dart';
 import '../core/nepal_time.dart';
 import '../core/qty.dart';
 import '../data/models.dart';
@@ -21,6 +22,9 @@ Map<String, Object?> productToMap(Product p) => {
   'letter': p.letter,
   'tileBg': p.tileBg,
   'tileInk': p.tileInk,
+  'packName': p.packName,
+  'packSizeMilli': p.packSizeMilli,
+  'labelKind': p.labelKind?.name,
 };
 
 Product productFromMap(String id, Map<String, dynamic> m) => Product(
@@ -37,6 +41,9 @@ Product productFromMap(String id, Map<String, dynamic> m) => Product(
   letter: m['letter'] as String? ?? _firstLetters(m['name_ne'] as String? ?? '?'),
   tileBg: _int(m['tileBg'], fallback: 0xFFE3F0E8),
   tileInk: _int(m['tileInk'], fallback: 0xFF14512F),
+  packName: m['packName'] as String?,
+  packSizeMilli: m['packSizeMilli'] as int?,
+  labelKind: LabelKind.values.asNameMap()[m['labelKind']],
 );
 
 Map<String, Object?> customerToMap(Customer c) => {
@@ -118,7 +125,8 @@ Sale saleFromMap(String id, Map<String, dynamic> m) {
 Map<String, Object?> stockEntryToMap(StockEntry e, {required String createdBy}) => {
   'source': e.source.wire,
   'lines': [
-    for (final l in e.lines) {'productId': l.productId, 'qtyMilli': l.qtyMilli, 'costPaisa': l.costPaisa},
+    for (final l in e.lines)
+      {'productId': l.productId, 'qtyMilli': l.qtyMilli, 'costPaisa': l.costPaisa, 'totalCostPaisa': l.totalCostPaisa},
   ],
   'totalPaisa': e.totalPaisa,
   'createdAt': Timestamp.fromDate(e.createdAt),

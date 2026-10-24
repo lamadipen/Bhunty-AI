@@ -35,7 +35,19 @@ List<Product> demoProducts() {
   );
 
   return [
-    p('waiwai', 'वाइवाइ', 'Wai Wai', 25, 18, Unit.packet, 6, 12, 'वा', 0xFFF6E3B4, 0xFF6B4A00),
+    p(
+      'waiwai',
+      'वाइवाइ',
+      'Wai Wai',
+      25,
+      18,
+      Unit.packet,
+      6,
+      12,
+      'वा',
+      0xFFF6E3B4,
+      0xFF6B4A00,
+    ).withPack('कार्टुन', 30 * milli),
     p('egg', 'अण्डा', 'Egg', 20, 16, Unit.piece, 90, 30, 'अ', 0xFFF3E7DA, 0xFF6A3F17),
     p('milk', 'दूध', 'Milk', 55, 48, Unit.packet, 20, 10, 'दू', 0xFFDCE8F5, 0xFF1E3E73),
     p('sugar', 'चिनी', 'Sugar', 120, 105, Unit.kg, 3, 5, 'चि', 0xFFEAE6F4, 0xFF3E2F73),
